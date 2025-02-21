@@ -6,99 +6,82 @@ use App\Core\Model;
 
 class UserProfile extends Model {
     protected static string $table = 'user_profiles';
-    protected $db;
     
-    public function __construct() {
-        parent::__construct();
-        $this->db = \App\Core\Database\Database::getInstance()->getConnection();
-    }
+    protected static array $fillable = [
+        'user_id',
+        'phone',
+        'address',
+        'city',
+        'state',
+        'postal_code',
+        'birth_date',
+        'bio',
+        'avatar',
+        'social_media',
+        'preferences',
+        'updated_at'
+    ];
     
-    public function getProfile(int $userId): array {
+    public static function getProfile(int $userId): array {
+        $db = self::getDB();
         $sql = "SELECT p.*, u.name, u.email, u.role, u.created_at as joined_date
-                FROM {$this->table} p
+                FROM " . self::$table . " p
                 RIGHT JOIN users u ON p.user_id = u.id
                 WHERE u.id = ?";
-        $stmt = $this->db->prepare($sql);
+        $stmt = $db->prepare($sql);
         $stmt->execute([$userId]);
-        return $stmt->fetch() ?: [];
+        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
     }
     
-    public function updateProfile(int $userId, array $data): bool {
-        // First, check if profile exists
-        $sql = "SELECT id FROM {$this->table} WHERE user_id = ?";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$userId]);
-        $profile = $stmt->fetch();
-        
-        if ($profile) {
-            // Update existing profile
-            $sql = "UPDATE {$this->table} SET 
-                    phone = ?,
-                    address = ?,
-                    city = ?,
-                    state = ?,
-                    postal_code = ?,
-                    birth_date = ?,
-                    bio = ?,
-                    avatar = ?,
-                    social_media = ?,
-                    preferences = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                    WHERE user_id = ?";
-        } else {
-            // Create new profile
-            $sql = "INSERT INTO {$this->table} (
-                    user_id, phone, address, city, state, postal_code, 
-                    birth_date, bio, avatar, social_media, preferences, 
-                    created_at, updated_at
-                ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                )";
+    public static function updateProfile(int $userId, array $data): bool {
+        try {
+            $db = self::getDB();
+            
+            // First, check if profile exists
+            $sql = "SELECT id FROM " . self::$table . " WHERE user_id = ?";
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$userId]);
+            $profile = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // Ensure updated_at is set
+            $data['updated_at'] = date('Y-m-d H:i:s');
+            
+            if ($profile) {
+                // Update existing profile
+                return self::update($profile['id'], $data);
+            } else {
+                // Create new profile
+                $data['user_id'] = $userId;
+                return (bool)self::create($data);
+            }
+        } catch (\Exception $e) {
+            error_log("[UserProfile] Error updating profile: " . $e->getMessage());
+            error_log("[UserProfile] Stack trace: " . $e->getTraceAsString());
+            return false;
         }
-        
-        $params = [
-            $data['phone'] ?? null,
-            $data['address'] ?? null,
-            $data['city'] ?? null,
-            $data['state'] ?? null,
-            $data['postal_code'] ?? null,
-            $data['birth_date'] ?? null,
-            $data['bio'] ?? null,
-            $data['avatar'] ?? null,
-            $data['social_media'] ? json_encode($data['social_media']) : null,
-            $data['preferences'] ? json_encode($data['preferences']) : null
-        ];
-        
-        if ($profile) {
-            $params[] = $userId;
-        } else {
-            array_unshift($params, $userId);
-        }
-        
-        $stmt = $this->db->prepare($sql);
-        return $stmt->execute($params);
     }
     
-    public function updateAvatar(int $userId, string $avatarPath): bool {
-        $sql = "UPDATE {$this->table} SET 
+    public static function updateAvatar(int $userId, string $avatarPath): bool {
+        $sql = "UPDATE " . self::$table . " SET 
                 avatar = ?, 
                 updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ?";
-        $stmt = $this->db->prepare($sql);
+        $db = self::getDB();
+        $stmt = $db->prepare($sql);
         return $stmt->execute([$avatarPath, $userId]);
     }
     
-    public function updatePreferences(int $userId, array $preferences): bool {
-        $sql = "UPDATE {$this->table} SET 
+    public static function updatePreferences(int $userId, array $preferences): bool {
+        $sql = "UPDATE " . self::$table . " SET 
                 preferences = ?, 
                 updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ?";
-        $stmt = $this->db->prepare($sql);
+        $db = self::getDB();
+        $stmt = $db->prepare($sql);
         return $stmt->execute([json_encode($preferences), $userId]);
     }
     
-    public function getDefaultPreferences(): array {
+    public static function getDefaultPreferences(): array {
         return [
             'theme' => 'light',
             'sidebar_collapsed' => false,
@@ -113,7 +96,7 @@ class UserProfile extends Model {
         ];
     }
     
-    public function getProfileStats(int $userId): array {
+    public static function getProfileStats(int $userId): array {
         // Get various statistics about the user's activity
         $sql = "SELECT 
                     (SELECT COUNT(*) FROM messages WHERE sender_id = ? OR recipient_id = ?) as total_messages,
@@ -121,12 +104,13 @@ class UserProfile extends Model {
                     (SELECT COUNT(*) FROM volunteer_schedules WHERE volunteer_id = ?) as total_schedules,
                     (SELECT COUNT(*) FROM financial_transactions WHERE created_by = ?) as total_transactions
                 FROM dual";
-        $stmt = $this->db->prepare($sql);
+        $db = self::getDB();
+        $stmt = $db->prepare($sql);
         $stmt->execute([$userId, $userId, $userId, $userId, $userId]);
-        return $stmt->fetch();
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
     }
     
-    public function getRecentActivity(int $userId, int $limit = 10): array {
+    public static function getRecentActivity(int $userId, int $limit = 10): array {
         $sql = "SELECT 'message' as type, 
                        id, 
                        subject as title, 
@@ -167,35 +151,39 @@ class UserProfile extends Model {
                 
                 ORDER BY created_at DESC
                 LIMIT ?";
-        $stmt = $this->db->prepare($sql);
+        $db = self::getDB();
+        $stmt = $db->prepare($sql);
         $stmt->execute([$userId, $userId, $userId, $userId, $userId, $limit]);
-        return $stmt->fetchAll();
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
-    public function validatePassword(int $userId, string $currentPassword): bool {
+    public static function validatePassword(int $userId, string $currentPassword): bool {
         $sql = "SELECT password FROM users WHERE id = ?";
-        $stmt = $this->db->prepare($sql);
+        $db = self::getDB();
+        $stmt = $db->prepare($sql);
         $stmt->execute([$userId]);
         $hash = $stmt->fetchColumn();
         
         return password_verify($currentPassword, $hash);
     }
     
-    public function updatePassword(int $userId, string $newPassword): bool {
+    public static function updatePassword(int $userId, string $newPassword): bool {
         $sql = "UPDATE users SET 
                 password = ?, 
                 updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?";
-        $stmt = $this->db->prepare($sql);
+        $db = self::getDB();
+        $stmt = $db->prepare($sql);
         return $stmt->execute([password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
     }
     
-    public function updateEmail(int $userId, string $newEmail): bool {
+    public static function updateEmail(int $userId, string $newEmail): bool {
         $sql = "UPDATE users SET 
                 email = ?, 
                 updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?";
-        $stmt = $this->db->prepare($sql);
+        $db = self::getDB();
+        $stmt = $db->prepare($sql);
         return $stmt->execute([$newEmail, $userId]);
     }
 }

@@ -197,40 +197,99 @@ $title = 'Visualizar Grupo';
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Adicionar Participante</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form action="/groups/<?= $group['id'] ?>/participants" method="POST">
+                    <form id="addParticipantForm" action="<?= url("/groups/{$group['id']}/participants") ?>" method="POST">
                         <?= csrf_field() ?>
                         
                         <div class="mb-3">
-                            <label class="form-label" for="user_id">Usuário</label>
-                            <select name="user_id" id="user_id" required class="form-select">
+                            <label for="participant_type" class="form-label">Tipo de Participante</label>
+                            <select class="form-select" id="participant_type" name="participant_type" required>
                                 <option value="">Selecione...</option>
-                                <?php foreach ($users as $user): ?>
-                                    <option value="<?= $user['id'] ?>"><?= htmlspecialchars($user['name']) ?></option>
-                                <?php endforeach; ?>
+                                <option value="visitor">Visitante</option>
+                                <option value="member">Membro</option>
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label" for="join_date">Data de Entrada</label>
-                            <input type="date" name="join_date" id="join_date" required
-                                value="<?= date('Y-m-d') ?>"
-                                class="form-control">
+                        <div id="visitor_select_div" class="mb-3" style="display: none;">
+                            <label for="visitor_id" class="form-label">Selecione o Visitante</label>
+                            <select class="form-select" id="visitor_id" name="visitor_id">
+                                <option value="">Selecione um visitante...</option>
+                                <?php if (!empty($visitors)): ?>
+                                    <?php foreach ($visitors as $visitor): ?>
+                                        <option value="<?= $visitor['id'] ?>">
+                                            <?= htmlspecialchars($visitor['name']) ?> 
+                                            <?php if (!empty($visitor['phone'])): ?>
+                                                - <?= htmlspecialchars($visitor['phone']) ?>
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
                         </div>
 
-                        <div class="text-end">
+                        <div id="member_select_div" class="mb-3" style="display: none;">
+                            <label for="member_id" class="form-label">Selecione o Membro</label>
+                            <select class="form-select" id="member_id" name="member_id">
+                                <option value="">Selecione um membro...</option>
+                                <?php if (!empty($members)): ?>
+                                    <?php foreach ($members as $member): ?>
+                                        <option value="<?= $member['id'] ?>">
+                                            <?= htmlspecialchars($member['name']) ?>
+                                            <?php if (!empty($member['phone'])): ?>
+                                                - <?= htmlspecialchars($member['phone']) ?>
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </select>
+                        </div>
+
+                        <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Adicionar
-                            </button>
+                            <button type="submit" class="btn btn-primary">Adicionar</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const participantType = document.getElementById('participant_type');
+        const visitorDiv = document.getElementById('visitor_select_div');
+        const memberDiv = document.getElementById('member_select_div');
+        const visitorSelect = document.getElementById('visitor_id');
+        const memberSelect = document.getElementById('member_id');
+
+        participantType.addEventListener('change', function() {
+            visitorDiv.style.display = 'none';
+            memberDiv.style.display = 'none';
+            visitorSelect.required = false;
+            memberSelect.required = false;
+
+            if (this.value === 'visitor') {
+                visitorDiv.style.display = 'block';
+                visitorSelect.required = true;
+            } else if (this.value === 'member') {
+                memberDiv.style.display = 'block';
+                memberSelect.required = true;
+            }
+        });
+
+        // Inicializar Select2 para melhor usabilidade
+        if (typeof $.fn.select2 !== 'undefined') {
+            $('#visitor_id, #member_id').select2({
+                dropdownParent: $('#addParticipantModal'),
+                width: '100%',
+                placeholder: 'Digite para buscar...',
+                allowClear: true
+            });
+        }
+    });
+    </script>
 
     <!-- Modal Nova Reunião -->
     <div class="modal fade" id="addMeetingModal" tabindex="-1">

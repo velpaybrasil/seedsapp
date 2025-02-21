@@ -36,7 +36,8 @@ class Visitor extends Model {
         'group_id',
         'follow_up_date',
         'follow_up_notes',
-        'follow_up_status'
+        'follow_up_status',
+        'updated_at'
     ];
 
     protected static array $validationRules = [

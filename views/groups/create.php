@@ -83,30 +83,40 @@ $title = 'Novo Grupo';
 
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <label for="max_participants" class="form-label">Número Máximo de Participantes</label>
+                        <label for="max_participants" class="form-label">Limite de Participantes</label>
                         <input type="number" class="form-control" id="max_participants" name="max_participants"
-                            value="<?= htmlspecialchars(old('max_participants', '12')) ?>"
+                            value="<?= htmlspecialchars(old('max_participants')) ?>"
                             min="1" max="100">
-                        <small class="form-text text-muted">Deixe em branco para usar o padrão (12)</small>
+                        <small class="form-text text-muted">Deixe em branco para não ter limite</small>
                     </div>
-
+                    
                     <div class="col-md-6">
-                        <label for="ministry_id" class="form-label">Ministério</label>
-                        <select class="form-select" id="ministry_id" name="ministry_id">
-                            <option value="">Selecione...</option>
-                            <?php foreach ($ministries as $ministry): ?>
-                                <option value="<?= $ministry['id'] ?>" <?= old('ministry_id') == $ministry['id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($ministry['name']) ?>
-                                </option>
-                            <?php endforeach; ?>
+                        <label for="ministry_id" class="form-label">Ministério *</label>
+                        <select class="form-select" id="ministry_id" name="ministry_id" required>
+                            <option value="">Selecione um ministério...</option>
+                            <?php if (!empty($ministries)): ?>
+                                <?php foreach ($ministries as $ministry): ?>
+                                    <option value="<?= $ministry['id'] ?>" <?= old('ministry_id') == $ministry['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($ministry['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </select>
+                        <small class="form-text text-muted">Ministério responsável pelo grupo</small>
                     </div>
                 </div>
 
-                <div class="text-end">
-                    <a href="/groups" class="btn btn-secondary me-2">Cancelar</a>
+                <div class="mb-3">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="active" <?= old('status') === 'active' ? 'selected' : '' ?>>Ativo</option>
+                        <option value="inactive" <?= old('status') === 'inactive' ? 'selected' : '' ?>>Inativo</option>
+                    </select>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                     <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Salvar
+                        <i class="fas fa-save me-1"></i> Salvar Grupo
                     </button>
                 </div>
             </form>

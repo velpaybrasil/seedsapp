@@ -361,25 +361,34 @@ class VisitorController extends Controller {
     
     public function update($id) {
         try {
+            error_log("[VisitorController] Starting update for visitor ID: " . $id);
+            
             // Validar CSRF
             if (!$this->validateCSRF()) {
-                $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Token CSRF inválido'
-                ], 403);
+                error_log("[VisitorController] Invalid CSRF token");
+                $this->setFlash('error', 'Token CSRF inválido');
+                redirect("/visitors/edit/{$id}");
                 return;
             }
 
             // Validar dados
             if (empty($_POST['name'])) {
-                throw new \Exception('O nome é obrigatório');
+                error_log("[VisitorController] Name is required");
+                $this->setFlash('error', 'O nome é obrigatório');
+                redirect("/visitors/edit/{$id}");
+                return;
             }
 
             // Buscar visitante existente
             $visitor = Visitor::find($id);
             if (!$visitor) {
-                throw new \Exception('Visitante não encontrado');
+                error_log("[VisitorController] Visitor not found: " . $id);
+                $this->setFlash('error', 'Visitante não encontrado');
+                redirect('/visitors');
+                return;
             }
+
+            error_log("[VisitorController] POST data: " . print_r($_POST, true));
 
             // Preparar dados
             $data = [
@@ -406,6 +415,8 @@ class VisitorController extends Controller {
                 'updated_at' => date('Y-m-d H:i:s')
             ];
 
+            error_log("[VisitorController] Initial data: " . print_r($data, true));
+
             // Sanitizar dados
             $data = array_map(function($value) {
                 return $value !== null ? trim($value) : null;
@@ -415,6 +426,8 @@ class VisitorController extends Controller {
                 return $value !== null ? strip_tags($value) : null;
             }, $data);
 
+            error_log("[VisitorController] Data after sanitization: " . print_r($data, true));
+
             // Remover campos vazios, exceto os que podem ser vazios
             $data = array_filter($data, function($value, $key) {
                 // Campos que podem ser vazios
@@ -422,11 +435,14 @@ class VisitorController extends Controller {
                     'email', 'phone', 'whatsapp', 'address', 'neighborhood', 
                     'city', 'state', 'zipcode', 'birth_date', 'first_visit_date',
                     'marital_status', 'profession', 'group_id', 'notes',
-                    'how_knew_church', 'prayer_requests', 'observations'
+                    'how_knew_church', 'prayer_requests', 'observations',
+                    'status', 'updated_at'
                 ];
                 
-                return in_array($key, $allowEmpty) || $value !== '' && $value !== null;
+                return in_array($key, $allowEmpty) || ($value !== '' && $value !== null);
             }, ARRAY_FILTER_USE_BOTH);
+
+            error_log("[VisitorController] Data after filtering: " . print_r($data, true));
 
             // Formatar telefone e CEP
             if (!empty($data['phone'])) {
@@ -439,26 +455,47 @@ class VisitorController extends Controller {
                 $data['zipcode'] = preg_replace('/[^0-9]/', '', $data['zipcode']);
             }
 
+            error_log("[VisitorController] Data after formatting: " . print_r($data, true));
+
             // Verificar se houve mudança de grupo
             $groupChanged = isset($data['group_id']) && $data['group_id'] != $visitor['group_id'];
 
             // Atualizar visitante
-            if (Visitor::update($id, $data)) {
-                // Se houve mudança de grupo, registrar no histórico
-                if ($groupChanged) {
-                    $this->addGroupChangeLog($id, $visitor['group_id'], $data['group_id']);
-                }
+            try {
+                $result = Visitor::update($id, $data);
+                error_log("[VisitorController] Update result: " . ($result ? "success" : "failed"));
+                
+                if ($result) {
+                    // Se houve mudança de grupo, registrar no histórico
+                    if ($groupChanged) {
+                        $this->addGroupChangeLog($id, $visitor['group_id'], $data['group_id']);
+                    }
 
-                $this->setFlash('success', 'Visitante atualizado com sucesso!');
-                redirect('/visitors');
-            } else {
-                throw new \Exception('Erro ao atualizar visitante');
+                    $this->setFlash('success', 'Visitante atualizado com sucesso!');
+                    redirect('/visitors');
+                } else {
+                    throw new \Exception('Erro ao atualizar visitante. Verifique o log para mais detalhes.');
+                }
+            } catch (\PDOException $e) {
+                error_log("[VisitorController] PDO error: " . $e->getMessage());
+                error_log("[VisitorController] SQL state: " . $e->getCode());
+                error_log("[VisitorController] Error info: " . print_r($e->errorInfo, true));
+                throw new \Exception('Erro no banco de dados: ' . $e->getMessage());
             }
 
         } catch (\Exception $e) {
             error_log("[VisitorController] Error updating visitor: " . $e->getMessage());
             error_log("[VisitorController] Data: " . print_r($data ?? [], true));
-            $this->setFlash('error', 'Erro ao atualizar visitante: ' . $e->getMessage());
+            error_log("[VisitorController] Stack trace: " . $e->getTraceAsString());
+            
+            // Em ambiente de desenvolvimento, mostrar o erro completo
+            if (defined('ENVIRONMENT') && ENVIRONMENT === 'development') {
+                $errorMessage = $e->getMessage() . "\n" . $e->getTraceAsString();
+            } else {
+                $errorMessage = 'Erro ao atualizar visitante. Por favor, tente novamente.';
+            }
+            
+            $this->setFlash('error', $errorMessage);
             redirect("/visitors/edit/{$id}");
         }
     }

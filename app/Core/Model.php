@@ -91,6 +91,22 @@ abstract class Model {
             
             $db = static::getDB();
             
+            // Filtrar apenas os campos fillable
+            if (!empty(static::$fillable)) {
+                $originalData = $data;
+                $data = array_intersect_key($data, array_flip(static::$fillable));
+                $removedFields = array_diff_key($originalData, $data);
+                if (!empty($removedFields)) {
+                    error_log("[Model] Fields removed (not in fillable): " . print_r(array_keys($removedFields), true));
+                }
+            }
+            
+            // Se não houver dados para atualizar, retorna true
+            if (empty($data)) {
+                error_log("[Model] No data to update");
+                return true;
+            }
+
             $fields = array_keys($data);
             $set = array_map(function($field) {
                 return "{$field} = :{$field}";
@@ -103,27 +119,43 @@ abstract class Model {
             error_log("[Model] SQL: " . $sql);
             $stmt = $db->prepare($sql);
             
-            // Criar array de parâmetros com os nomes corretos
-            $params = array_combine(
-                array_map(function($field) {
-                    return ":{$field}";
-                }, $fields),
-                array_values($data)
-            );
-            $params[':id'] = $id;
+            // Bind cada parâmetro individualmente para garantir o tipo correto
+            foreach ($data as $field => $value) {
+                $param = ":{$field}";
+                if (is_null($value)) {
+                    error_log("[Model] Binding NULL value for {$field}");
+                    $stmt->bindValue($param, null, PDO::PARAM_NULL);
+                } elseif (is_bool($value)) {
+                    error_log("[Model] Binding BOOL value for {$field}: " . ($value ? 'true' : 'false'));
+                    $stmt->bindValue($param, $value, PDO::PARAM_BOOL);
+                } elseif (is_int($value)) {
+                    error_log("[Model] Binding INT value for {$field}: {$value}");
+                    $stmt->bindValue($param, $value, PDO::PARAM_INT);
+                } else {
+                    error_log("[Model] Binding STRING value for {$field}: {$value}");
+                    $stmt->bindValue($param, $value, PDO::PARAM_STR);
+                }
+            }
             
-            error_log("[Model] Params: " . print_r($params, true));
-            $result = $stmt->execute($params);
+            // Bind do ID separadamente
+            error_log("[Model] Binding ID: {$id}");
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            
+            error_log("[Model] Executing update...");
+            $result = $stmt->execute();
             
             if ($result) {
                 error_log("[Model] Record updated successfully");
                 return true;
             } else {
-                error_log("[Model] Failed to update record");
-                return false;
+                $errorInfo = $stmt->errorInfo();
+                error_log("[Model] Failed to update record. Error info: " . print_r($errorInfo, true));
+                throw new \PDOException("Database error: " . ($errorInfo[2] ?? 'Unknown error'));
             }
         } catch (\PDOException $e) {
             error_log("[Model] Database error updating record: " . $e->getMessage());
+            error_log("[Model] SQL State: " . $e->getCode());
+            error_log("[Model] Error info: " . print_r($e->errorInfo ?? [], true));
             error_log("[Model] Stack trace: " . $e->getTraceAsString());
             throw $e;
         } catch (\Exception $e) {

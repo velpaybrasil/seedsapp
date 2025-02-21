@@ -100,6 +100,10 @@ class GroupController extends Controller {
         try {
             error_log("[GroupController] Iniciando criação de grupo");
             
+            // Buscar lista de ministérios
+            $ministries = $this->ministryModel->getAll();
+            error_log("[GroupController] Ministérios encontrados: " . count($ministries));
+            
             if ($this->isPost()) {
                 $data = $this->getPostData();
                 error_log("[GroupController] Dados recebidos: " . json_encode($data));
@@ -147,7 +151,6 @@ class GroupController extends Controller {
             }
 
             $leaders = $this->userModel->all();
-            $ministries = $this->ministryModel->all(['status' => 'active']);
             
             error_log("[GroupController] Carregando formulário de criação");
             error_log("[GroupController] Total de líderes disponíveis: " . count($leaders));
@@ -322,49 +325,135 @@ class GroupController extends Controller {
         }
     }
 
-    public function addParticipant(): void {
+    public function addParticipant($groupId): void {
         try {
-            $data = json_decode(file_get_contents('php://input'), true);
-            $userId = $data['user_id'] ?? null;
-            $groupId = $data['group_id'] ?? null;
+            // Validar CSRF
+            if (!$this->validateCSRF()) {
+                $this->setFlash('error', 'Token CSRF inválido');
+                redirect("/groups/view/{$groupId}");
+                return;
+            }
 
-            if (!$userId || !$groupId) {
-                $this->jsonResponse(['error' => 'Dados inválidos'], 400);
+            $participantType = $_POST['participant_type'] ?? '';
+            $visitorId = $_POST['visitor_id'] ?? null;
+            $memberId = $_POST['member_id'] ?? null;
+
+            error_log("[GroupController] Adicionando participante ao grupo {$groupId}");
+            error_log("[GroupController] Tipo: {$participantType}");
+            error_log("[GroupController] Visitor ID: {$visitorId}");
+            error_log("[GroupController] Member ID: {$memberId}");
+
+            // Validar dados
+            if (!$participantType || ($participantType === 'visitor' && !$visitorId) || ($participantType === 'member' && !$memberId)) {
+                $this->setFlash('error', 'Dados inválidos');
+                redirect("/groups/view/{$groupId}");
                 return;
             }
 
             // Verificar se o grupo existe
             $group = $this->groupModel->find($groupId);
             if (!$group) {
-                $this->jsonResponse(['error' => 'Grupo não encontrado'], 404);
+                $this->setFlash('error', 'Grupo não encontrado');
+                redirect('/groups');
                 return;
             }
 
-            // Verificar se o usuário existe
-            $user = $this->userModel->find($userId);
-            if (!$user) {
-                $this->jsonResponse(['error' => 'Usuário não encontrado'], 404);
+            // Verificar limite de participantes
+            $currentMembers = $this->groupModel->getGroupMembers($groupId);
+            if (!empty($group['max_participants']) && count($currentMembers) >= $group['max_participants']) {
+                $this->setFlash('error', 'O grupo já atingiu o limite máximo de participantes');
+                redirect("/groups/view/{$groupId}");
                 return;
             }
 
-            // Verificar se o grupo tem vagas disponíveis
-            $participants = $this->groupModel->getParticipants($groupId);
-            if (count($participants) >= $group['max_participants']) {
-                $this->jsonResponse(['error' => 'Grupo está cheio'], 400);
-                return;
-            }
+            if ($participantType === 'visitor') {
+                // Verificar se o visitante existe
+                $visitor = $this->visitorModel->find($visitorId);
+                if (!$visitor) {
+                    $this->setFlash('error', 'Visitante não encontrado');
+                    redirect("/groups/view/{$groupId}");
+                    return;
+                }
 
-            // Adicionar o usuário ao grupo
-            if ($this->groupModel->addParticipant($groupId, $userId)) {
-                $this->jsonResponse(['success' => true]);
+                // Verificar se o visitante já está em algum grupo
+                if ($this->groupModel->isVisitorInAnyGroup($visitorId)) {
+                    $this->setFlash('error', 'Este visitante já está em outro grupo');
+                    redirect("/groups/view/{$groupId}");
+                    return;
+                }
+
+                // Adicionar visitante ao grupo
+                if ($this->groupModel->addVisitorToGroup($groupId, $visitorId)) {
+                    $this->setFlash('success', 'Visitante adicionado ao grupo com sucesso!');
+                } else {
+                    $this->setFlash('error', 'Erro ao adicionar visitante ao grupo');
+                }
             } else {
-                $this->jsonResponse(['error' => 'Erro ao adicionar usuário ao grupo'], 500);
+                // Verificar se o membro existe
+                $member = $this->userModel->find($memberId);
+                if (!$member) {
+                    $this->setFlash('error', 'Membro não encontrado');
+                    redirect("/groups/view/{$groupId}");
+                    return;
+                }
+
+                // Verificar se o membro já está em algum grupo
+                if ($this->groupModel->isMemberInAnyGroup($memberId)) {
+                    $this->setFlash('error', 'Este membro já está em outro grupo');
+                    redirect("/groups/view/{$groupId}");
+                    return;
+                }
+
+                // Adicionar membro ao grupo
+                if ($this->groupModel->addMemberToGroup($groupId, $memberId)) {
+                    $this->setFlash('success', 'Membro adicionado ao grupo com sucesso!');
+                } else {
+                    $this->setFlash('error', 'Erro ao adicionar membro ao grupo');
+                }
             }
 
-        } catch (\Exception $e) {
-            error_log("[GroupController] Erro ao adicionar usuário ao grupo: " . $e->getMessage());
+            redirect("/groups/view/{$groupId}");
+        } catch (Exception $e) {
+            error_log("[GroupController] Erro ao adicionar participante: " . $e->getMessage());
             error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-            $this->jsonResponse(['error' => $e->getMessage()], 500);
+            $this->setFlash('error', 'Erro ao adicionar participante ao grupo');
+            redirect("/groups/view/{$groupId}");
+        }
+    }
+
+    public function view($id): void {
+        try {
+            $group = $this->groupModel->find($id);
+            if (!$group) {
+                $this->setFlash('error', 'Grupo não encontrado');
+                redirect('/groups');
+                return;
+            }
+
+            // Buscar membros ativos
+            $members = $this->groupModel->getGroupMembers($id);
+            
+            // Buscar visitantes que não estão em nenhum grupo
+            $visitors = $this->visitorModel->getVisitorsWithoutGroup();
+            
+            // Buscar membros que não estão em nenhum grupo
+            $availableMembers = $this->userModel->getMembersWithoutGroup();
+            
+            // Buscar reuniões do grupo
+            $meetings = $this->groupModel->getGroupMeetings($id);
+
+            View::render('groups/view', [
+                'group' => $group,
+                'members' => $members,
+                'visitors' => $visitors,
+                'availableMembers' => $availableMembers,
+                'meetings' => $meetings
+            ]);
+        } catch (Exception $e) {
+            error_log("[GroupController] Erro ao visualizar grupo: " . $e->getMessage());
+            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
+            $this->setFlash('error', 'Erro ao carregar dados do grupo');
+            redirect('/groups');
         }
     }
 

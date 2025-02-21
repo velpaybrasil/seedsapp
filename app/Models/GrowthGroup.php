@@ -657,4 +657,127 @@ class GrowthGroup extends Model
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public static function getGroupMembers($groupId): array {
+        try {
+            $db = self::getDB();
+            $sql = "SELECT gm.*, u.name, u.email, u.phone, u.role as user_role
+                    FROM group_members gm
+                    INNER JOIN users u ON gm.user_id = u.id
+                    WHERE gm.group_id = ? AND gm.status = 'approved'
+                    ORDER BY u.name";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$groupId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao buscar membros do grupo: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public static function isVisitorInAnyGroup($visitorId): bool {
+        try {
+            $db = self::getDB();
+            $sql = "SELECT COUNT(*) FROM group_members WHERE user_id = ? AND status = 'approved'";
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$visitorId]);
+            return (int)$stmt->fetchColumn() > 0;
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao verificar visitante em grupos: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function isMemberInAnyGroup($memberId): bool {
+        try {
+            $db = self::getDB();
+            $sql = "SELECT COUNT(*) FROM group_members WHERE user_id = ? AND status = 'approved'";
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$memberId]);
+            return (int)$stmt->fetchColumn() > 0;
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao verificar membro em grupos: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function addVisitorToGroup($groupId, $visitorId): bool {
+        try {
+            $db = self::getDB();
+            $db->beginTransaction();
+
+            $sql = "INSERT INTO group_members (
+                        group_id, user_id, status, role, 
+                        joined_at, created_at, updated_at
+                    ) VALUES (
+                        ?, ?, 'approved', 'member',
+                        NOW(), NOW(), NOW()
+                    )";
+            
+            $stmt = $db->prepare($sql);
+            $result = $stmt->execute([$groupId, $visitorId]);
+
+            if ($result) {
+                // Atualizar o status do visitante
+                $sql = "UPDATE visitors SET 
+                        group_id = ?, 
+                        status = 'active',
+                        updated_at = NOW() 
+                        WHERE id = ?";
+                $stmt = $db->prepare($sql);
+                $stmt->execute([$groupId, $visitorId]);
+                
+                $db->commit();
+                return true;
+            }
+
+            $db->rollBack();
+            return false;
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao adicionar visitante ao grupo: " . $e->getMessage());
+            if (isset($db)) {
+                $db->rollBack();
+            }
+            return false;
+        }
+    }
+
+    public static function addMemberToGroup($groupId, $memberId): bool {
+        try {
+            $db = self::getDB();
+            $sql = "INSERT INTO group_members (
+                        group_id, user_id, status, role, 
+                        joined_at, created_at, updated_at
+                    ) VALUES (
+                        ?, ?, 'approved', 'member',
+                        NOW(), NOW(), NOW()
+                    )";
+            
+            $stmt = $db->prepare($sql);
+            return $stmt->execute([$groupId, $memberId]);
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao adicionar membro ao grupo: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function getGroupMeetings($groupId): array {
+        try {
+            $db = self::getDB();
+            $sql = "SELECT m.*, 
+                    (SELECT COUNT(*) FROM meeting_attendance ma WHERE ma.meeting_id = m.id) as total_attendees,
+                    (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = m.group_id AND gm.status = 'approved') as total_participants
+                    FROM group_meetings m
+                    WHERE m.group_id = ?
+                    ORDER BY m.meeting_date DESC";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$groupId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao buscar reuniões do grupo: " . $e->getMessage());
+            return [];
+        }
+    }
 }
