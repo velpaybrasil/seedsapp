@@ -468,7 +468,7 @@ class VisitorController extends Controller {
                 if ($result) {
                     // Se houve mudança de grupo, registrar no histórico
                     if ($groupChanged) {
-                        $this->addGroupChangeLog($id, $visitor['group_id'], $data['group_id']);
+                        $this->addToGroupHistory($id, $visitor['group_id'], $data['group_id']);
                     }
 
                     $this->setFlash('success', 'Visitante atualizado com sucesso!');
@@ -489,7 +489,7 @@ class VisitorController extends Controller {
             error_log("[VisitorController] Stack trace: " . $e->getTraceAsString());
             
             // Em ambiente de desenvolvimento, mostrar o erro completo
-            if (defined('ENVIRONMENT') && ENVIRONMENT === 'development') {
+            if (defined('APP_ENV') && APP_ENV === 'development') {
                 $errorMessage = $e->getMessage() . "\n" . $e->getTraceAsString();
             } else {
                 $errorMessage = 'Erro ao atualizar visitante. Por favor, tente novamente.';
@@ -661,7 +661,7 @@ class VisitorController extends Controller {
         try {
             $sql = "INSERT INTO visitor_follow_ups (visitor_id, contact_date, contact_type, notes, status, next_contact) 
                     VALUES (?, ?, ?, ?, 'pending', ?)";
-            $stmt = Database::getInstance()->getConnection()->prepare($sql);
+            $stmt = $this->db->getConnection()->prepare($sql);
             $stmt->execute([
                 $visitorId,
                 $data['contact_date'],
@@ -890,7 +890,7 @@ class VisitorController extends Controller {
         try {
             $sql = "INSERT INTO visitor_group_history (visitor_id, group_id, join_date) 
                     VALUES (?, ?, CURDATE())";
-            $stmt = Database::getInstance()->getConnection()->prepare($sql);
+            $stmt = $this->db->getConnection()->prepare($sql);
             $stmt->execute([$visitorId, $groupId]);
             
             error_log("[VisitorController] Histórico de grupo adicionado: Visitante {$visitorId} -> Grupo {$groupId}");
@@ -904,7 +904,7 @@ class VisitorController extends Controller {
         try {
             $sql = "INSERT INTO visitor_group_changes (visitor_id, old_group_id, new_group_id, change_date) 
                     VALUES (?, ?, ?, CURDATE())";
-            $stmt = Database::getInstance()->getConnection()->prepare($sql);
+            $stmt = $this->db->getConnection()->prepare($sql);
             $stmt->execute([$visitorId, $oldGroupId, $newGroupId]);
             
             error_log("[VisitorController] Mudança de grupo registrada: Visitante {$visitorId} -> Grupo {$oldGroupId} para {$newGroupId}");
@@ -938,18 +938,15 @@ class VisitorController extends Controller {
 
     private function getPendingFollowUps(): array {
         try {
-            $sql = "SELECT v.name as visitor_name, f.* 
+            $sql = "SELECT f.*, v.name as visitor_name, v.phone as visitor_phone
                     FROM visitor_follow_ups f
-                    INNER JOIN visitors v ON v.id = f.visitor_id
+                    JOIN visitors v ON f.visitor_id = v.id
                     WHERE f.status = 'pending'
                     ORDER BY f.contact_date ASC
                     LIMIT 10";
-            $stmt = Database::getInstance()->getConnection()->prepare($sql);
+            $stmt = $this->db->getConnection()->prepare($sql);
             $stmt->execute();
-            $followUps = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            error_log("[VisitorController] Follow-ups pendentes obtidos: " . count($followUps));
-            return $followUps;
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\PDOException $e) {
             error_log("[VisitorController] Erro ao buscar follow-ups pendentes: " . $e->getMessage());
             return [];

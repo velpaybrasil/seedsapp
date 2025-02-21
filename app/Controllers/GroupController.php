@@ -8,6 +8,7 @@ use App\Models\GrowthGroup;
 use App\Models\User;
 use App\Models\Visitor;
 use App\Models\Ministry;
+use App\Models\GroupLeader;
 use App\Core\Database\Database;
 use Exception;
 use PDOException;
@@ -18,6 +19,7 @@ class GroupController extends Controller {
     protected User $userModel;
     protected Visitor $visitorModel;
     protected Ministry $ministryModel;
+    protected GroupLeader $groupLeaderModel;
     protected Database $db;
     protected Session $session;
 
@@ -27,6 +29,7 @@ class GroupController extends Controller {
         $this->visitorModel = new Visitor();
         $this->ministryModel = new Ministry();
         $this->userModel = new User();
+        $this->groupLeaderModel = new GroupLeader();
         $this->session = new Session();
     }
 
@@ -43,7 +46,7 @@ class GroupController extends Controller {
                 try {
                     // Get and format leaders - handle missing table gracefully
                     try {
-                        $leaders = $this->groupModel->getGroupLeaders($group['id']);
+                        $leaders = $this->groupLeaderModel->getGroupLeaders($group['id']);
                         $group['leader_name'] = 'Sem líder';
                         $leaderNames = [];
                         
@@ -103,6 +106,10 @@ class GroupController extends Controller {
             // Buscar lista de ministérios
             $ministries = $this->ministryModel->getAll();
             error_log("[GroupController] Ministérios encontrados: " . count($ministries));
+
+            // Buscar líderes disponíveis
+            $leaders = $this->userModel->getLeaders();
+            error_log("[GroupController] Líderes encontrados: " . count($leaders));
             
             if ($this->isPost()) {
                 $data = $this->getPostData();
@@ -118,6 +125,7 @@ class GroupController extends Controller {
                         'meeting_address' => 'required',
                         'neighborhood' => 'required',
                         'max_participants' => 'required|numeric',
+                        'ministry_id' => 'required|numeric',
                         'leaders' => 'required|array|min:1',
                         'latitude' => 'numeric|between:-90,90',
                         'longitude' => 'numeric|between:-180,180'
@@ -149,14 +157,12 @@ class GroupController extends Controller {
                 }
                 return;
             }
-
-            $leaders = $this->userModel->all();
             
             error_log("[GroupController] Carregando formulário de criação");
             error_log("[GroupController] Total de líderes disponíveis: " . count($leaders));
             error_log("[GroupController] Total de ministérios disponíveis: " . count($ministries));
             
-            View::render('groups/create', [
+            $this->view('groups/create', [
                 'title' => 'Criar Grupo',
                 'leaders' => $leaders,
                 'ministries' => $ministries,
@@ -171,157 +177,53 @@ class GroupController extends Controller {
         }
     }
 
-    public function edit($id): void
-    {
+    public function viewGroup($id): void {
         try {
-            // Buscar grupo
             $group = $this->groupModel->find($id);
             if (!$group) {
-                $this->setFlash('error', 'Grupo não encontrado.');
-                $this->redirect('/groups');
+                $this->setFlash('error', 'Grupo não encontrado');
+                redirect('/groups');
                 return;
             }
 
-            // Se for POST, processar atualização
-            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                $this->update($id);
-                return;
-            }
-
-            // Buscar dados para o formulário
-            $ministries = $this->ministryModel->findAll([], ['name' => 'ASC']);
-            $leaders = $this->groupModel->getGroupLeaders($id);
-            $users = $this->userModel->findAll(['active' => 1], ['name' => 'ASC']);
+            // Buscar membros ativos
+            $members = $this->groupModel->getGroupMembers($id);
             
-            // Renderizar view
-            View::render('groups/edit', [
+            // Buscar visitantes que não estão em nenhum grupo
+            $visitors = $this->getVisitorsWithoutGroup();
+            
+            // Buscar membros que não estão em nenhum grupo
+            $availableMembers = $this->userModel->getMembersWithoutGroup();
+            
+            // Buscar reuniões do grupo
+            $meetings = $this->groupModel->getGroupMeetings($id);
+
+            $this->view('groups/view', [
                 'group' => $group,
-                'ministries' => $ministries,
-                'leaders' => $leaders,
-                'users' => $users
+                'members' => $members,
+                'visitors' => $visitors,
+                'availableMembers' => $availableMembers,
+                'meetings' => $meetings
             ]);
         } catch (Exception $e) {
-            error_log("[GroupController] Erro ao editar grupo: " . $e->getMessage());
-            $this->setFlash('error', 'Erro ao carregar dados do grupo.');
-            $this->redirect('/groups');
+            error_log("[GroupController] Erro ao visualizar grupo: " . $e->getMessage());
+            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
+            $this->setFlash('error', 'Erro ao carregar dados do grupo');
+            redirect('/groups');
         }
     }
 
-    public function update($id): void {
+    private function getVisitorsWithoutGroup(): array {
         try {
-            // Validar CSRF
-            if (!$this->validateCSRF()) {
-                $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Token CSRF inválido'
-                ], 403);
-                return;
-            }
-
-            error_log("[GroupController] Iniciando atualização do grupo ID: " . $id);
-
-            // Verificar se o grupo existe
-            $group = $this->groupModel->find($id);
-            if (!$group) {
-                error_log("[GroupController] Grupo não encontrado: " . $id);
-                $this->setFlash('error', 'Grupo não encontrado.');
-                $this->redirect('/groups');
-                return;
-            }
-
-            // Obter e tratar dados do formulário
-            $data = $_POST;
-            error_log("[GroupController] POST data bruto: " . print_r($_POST, true));
-            error_log("[GroupController] Files data: " . print_r($_FILES, true));
-
-            // Tratar campos numéricos
-            $data['max_participants'] = !empty($data['max_participants']) ? intval($data['max_participants']) : null;
-            $data['ministry_id'] = !empty($data['ministry_id']) ? intval($data['ministry_id']) : null;
-            
-            // Tratar coordenadas
-            $data['latitude'] = !empty($data['latitude']) ? floatval($data['latitude']) : null;
-            $data['longitude'] = !empty($data['longitude']) ? floatval($data['longitude']) : null;
-
-            // Tratar campos de data e hora
-            if (!empty($data['meeting_time'])) {
-                $data['meeting_time'] = date('H:i:s', strtotime($data['meeting_time']));
-            }
-
-            error_log("[GroupController] Dados processados antes de enviar ao modelo: " . print_r($data, true));
-
-            // Validação mínima
-            if (empty($data['name'])) {
-                $this->setFlash('error', 'O nome do grupo é obrigatório.');
-                $this->redirect("/groups/{$id}/edit");
-                return;
-            }
-
-            // Atualizar grupo
-            if ($this->groupModel->update($id, $data)) {
-                error_log("[GroupController] Atualização concluída com sucesso");
-                $this->setFlash('success', 'Grupo atualizado com sucesso!');
-            } else {
-                throw new \Exception("Falha ao atualizar o grupo");
-            }
-
-        } catch (\Exception $e) {
-            error_log("[GroupController] Erro ao atualizar grupo: " . $e->getMessage());
-            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-            $this->setFlash('error', 'Erro ao atualizar o grupo. Por favor, tente novamente.');
-        }
-
-        $this->redirect('/groups');
-    }
-
-    public function delete(int $id): void
-    {
-        try {
-            $group = $this->groupModel->find($id);
-            if (!$group) {
-                $this->jsonResponse(['error' => 'Grupo não encontrado'], 404);
-            }
-
-            $this->groupModel->delete($id);
-            $this->jsonResponse(['success' => true]);
-        } catch (Exception $e) {
-            error_log("[GroupController] Erro ao excluir grupo: " . $e->getMessage());
-            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-            $this->jsonResponse(['error' => 'Erro ao excluir grupo'], 500);
-        }
-    }
-
-    public function show(int $id): void
-    {
-        try {
-            $group = $this->groupModel->find($id);
-            if (!$group) {
-                $this->jsonResponse(['error' => 'Grupo não encontrado'], 404);
-                return;
-            }
-
-            // Get leaders with full information
-            $leaders = $this->groupModel->getGroupLeaders($id);
-
-            // Get ministry information
-            $ministry = null;
-            if (!empty($group['ministry_id'])) {
-                $ministry = $this->ministryModel->find($group['ministry_id']);
-            }
-
-            // Format meeting time
-            if (!empty($group['meeting_time'])) {
-                $group['meeting_time'] = date('H:i', strtotime($group['meeting_time']));
-            }
-
-            $this->jsonResponse([
-                'group' => $group,
-                'leaders' => $leaders,
-                'ministry' => $ministry
-            ]);
-        } catch (Exception $e) {
-            error_log("[GroupController] Erro ao buscar detalhes do grupo: " . $e->getMessage());
-            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-            $this->jsonResponse(['error' => 'Erro ao processar a requisição'], 500);
+            $sql = "SELECT v.* FROM visitors v 
+                    LEFT JOIN group_members gm ON v.id = gm.visitor_id 
+                    WHERE gm.id IS NULL AND v.status = 'active'";
+            $stmt = $this->db->getConnection()->prepare($sql);
+            $stmt->execute();
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[GroupController] Erro ao buscar visitantes sem grupo: " . $e->getMessage());
+            return [];
         }
     }
 
@@ -421,180 +323,169 @@ class GroupController extends Controller {
         }
     }
 
-    public function view($id): void {
+    public function edit($id): void
+    {
         try {
+            // Buscar grupo
             $group = $this->groupModel->find($id);
             if (!$group) {
-                $this->setFlash('error', 'Grupo não encontrado');
-                redirect('/groups');
+                $this->setFlash('error', 'Grupo não encontrado.');
+                $this->redirect('/groups');
                 return;
             }
 
-            // Buscar membros ativos
-            $members = $this->groupModel->getGroupMembers($id);
-            
-            // Buscar visitantes que não estão em nenhum grupo
-            $visitors = $this->visitorModel->getVisitorsWithoutGroup();
-            
-            // Buscar membros que não estão em nenhum grupo
-            $availableMembers = $this->userModel->getMembersWithoutGroup();
-            
-            // Buscar reuniões do grupo
-            $meetings = $this->groupModel->getGroupMeetings($id);
+            // Se for POST, processar atualização
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $this->update($id);
+                return;
+            }
 
-            View::render('groups/view', [
+            // Buscar dados para o formulário
+            $ministries = $this->ministryModel->getAll();
+            $leaders = $this->groupLeaderModel->getGroupLeaders($id);
+            $users = $this->userModel->getAll();
+            
+            // Renderizar view
+            View::render('groups/edit', [
                 'group' => $group,
-                'members' => $members,
-                'visitors' => $visitors,
-                'availableMembers' => $availableMembers,
-                'meetings' => $meetings
+                'ministries' => $ministries,
+                'leaders' => $leaders,
+                'users' => $users
             ]);
         } catch (Exception $e) {
-            error_log("[GroupController] Erro ao visualizar grupo: " . $e->getMessage());
-            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-            $this->setFlash('error', 'Erro ao carregar dados do grupo');
-            redirect('/groups');
+            error_log("[GroupController] Erro ao editar grupo: " . $e->getMessage());
+            $this->setFlash('error', 'Erro ao carregar dados do grupo.');
+            $this->redirect('/groups');
         }
     }
 
-    public function showGroup($id)
+    public function update($id): void {
+        try {
+            // Validar CSRF
+            if (!$this->validateCSRF()) {
+                $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Token CSRF inválido'
+                ], 403);
+                return;
+            }
+
+            error_log("[GroupController] Iniciando atualização do grupo ID: " . $id);
+
+            // Verificar se o grupo existe
+            $group = $this->groupModel->find($id);
+            if (!$group) {
+                error_log("[GroupController] Grupo não encontrado: " . $id);
+                $this->setFlash('error', 'Grupo não encontrado.');
+                $this->redirect('/groups');
+                return;
+            }
+
+            // Obter e tratar dados do formulário
+            $data = $_POST;
+            error_log("[GroupController] POST data bruto: " . print_r($_POST, true));
+            error_log("[GroupController] Files data: " . print_r($_FILES, true));
+
+            // Tratar campos numéricos
+            $data['max_participants'] = !empty($data['max_participants']) ? intval($data['max_participants']) : null;
+            $data['ministry_id'] = !empty($data['ministry_id']) ? intval($data['ministry_id']) : null;
+            
+            // Tratar coordenadas
+            $data['latitude'] = !empty($data['latitude']) ? floatval($data['latitude']) : null;
+            $data['longitude'] = !empty($data['longitude']) ? floatval($data['longitude']) : null;
+
+            // Tratar campos de data e hora
+            if (!empty($data['meeting_time'])) {
+                $data['meeting_time'] = date('H:i:s', strtotime($data['meeting_time']));
+            }
+
+            error_log("[GroupController] Dados processados antes de enviar ao modelo: " . print_r($data, true));
+
+            // Validação mínima
+            if (empty($data['name'])) {
+                $this->setFlash('error', 'O nome do grupo é obrigatório.');
+                $this->redirect("/groups/{$id}/edit");
+                return;
+            }
+
+            // Atualizar grupo
+            if ($this->groupModel->update($id, $data)) {
+                error_log("[GroupController] Atualização concluída com sucesso");
+                $this->setFlash('success', 'Grupo atualizado com sucesso!');
+            } else {
+                throw new \Exception("Falha ao atualizar o grupo");
+            }
+
+            // Atualizar líderes
+            $leaders = array_map(function($leaderId) {
+                return [
+                    'user_id' => (int) $leaderId,
+                    'role' => 'leader'
+                ];
+            }, $_POST['leaders'] ?? []);
+
+            if (!$this->groupLeaderModel->updateGroupLeaders($id, $leaders)) {
+                throw new \Exception('Erro ao atualizar os líderes do grupo');
+            }
+
+        } catch (\Exception $e) {
+            error_log("[GroupController] Erro ao atualizar grupo: " . $e->getMessage());
+            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
+            $this->setFlash('error', 'Erro ao atualizar o grupo. Por favor, tente novamente.');
+        }
+
+        $this->redirect('/groups');
+    }
+
+    public function delete(int $id): void
     {
         try {
             $group = $this->groupModel->find($id);
             if (!$group) {
-                throw new \Exception('Grupo não encontrado');
+                $this->jsonResponse(['error' => 'Grupo não encontrado'], 404);
             }
 
-            // Buscar líderes do grupo
-            $leaders = $this->groupModel->getGroupLeaders($id);
+            $this->groupModel->delete($id);
+            $this->jsonResponse(['success' => true]);
+        } catch (Exception $e) {
+            error_log("[GroupController] Erro ao excluir grupo: " . $e->getMessage());
+            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
+            $this->jsonResponse(['error' => 'Erro ao excluir grupo'], 500);
+        }
+    }
 
-            // Buscar membros pendentes e aprovados
-            $pendingMembers = $this->groupModel->getMembers('pending');
-            $approvedMembers = $this->groupModel->getMembers('approved');
+    public function show(int $id): void
+    {
+        try {
+            $group = $this->groupModel->find($id);
+            if (!$group) {
+                $this->jsonResponse(['error' => 'Grupo não encontrado'], 404);
+                return;
+            }
 
-            return $this->view('groups/show', [
+            // Get leaders with full information
+            $leaders = $this->groupLeaderModel->getGroupLeaders($id);
+
+            // Get ministry information
+            $ministry = null;
+            if (!empty($group['ministry_id'])) {
+                $ministry = $this->ministryModel->find($group['ministry_id']);
+            }
+
+            // Format meeting time
+            if (!empty($group['meeting_time'])) {
+                $group['meeting_time'] = date('H:i', strtotime($group['meeting_time']));
+            }
+
+            $this->jsonResponse([
                 'group' => $group,
                 'leaders' => $leaders,
-                'pendingMembers' => $pendingMembers,
-                'approvedMembers' => $approvedMembers
+                'ministry' => $ministry
             ]);
-
-        } catch (\Exception $e) {
-            error_log("Erro ao carregar grupo: " . $e->getMessage());
-            $this->session->setFlash('error', 'Erro ao carregar grupo');
-            return $this->redirect('/groups');
-        }
-    }
-
-    public function approveMember($groupId, $userId)
-    {
-        try {
-            // Validar CSRF
-            if (!$this->validateCSRF()) {
-                $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Token CSRF inválido'
-                ], 403);
-                return;
-            }
-
-            $group = $this->groupModel->find($groupId);
-            if (!$group) {
-                throw new \Exception('Grupo não encontrado');
-            }
-
-            if ($group->updateMemberStatus($userId, 'approved')) {
-                $this->session->setFlash('success', 'Membro aprovado com sucesso!');
-            } else {
-                throw new \Exception('Erro ao aprovar membro');
-            }
-
-        } catch (\Exception $e) {
-            error_log("Erro ao aprovar membro: " . $e->getMessage());
-            $this->session->setFlash('error', $e->getMessage());
-        }
-
-        return $this->redirect("/groups/{$groupId}");
-    }
-
-    public function rejectMember($groupId, $userId)
-    {
-        try {
-            // Validar CSRF
-            if (!$this->validateCSRF()) {
-                $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Token CSRF inválido'
-                ], 403);
-                return;
-            }
-
-            $group = $this->groupModel->find($groupId);
-            if (!$group) {
-                throw new \Exception('Grupo não encontrado');
-            }
-
-            if ($group->updateMemberStatus($userId, 'rejected')) {
-                $this->session->setFlash('success', 'Inscrição rejeitada com sucesso');
-            } else {
-                throw new \Exception('Erro ao rejeitar inscrição');
-            }
-
-        } catch (\Exception $e) {
-            error_log("Erro ao rejeitar membro: " . $e->getMessage());
-            // $this->session->setFlash('error', $e->getMessage());
-        }
-
-        return $this->redirect("/groups/{$groupId}");
-    }
-
-    protected function getPostData(): array {
-        return [
-            'name' => $_POST['name'] ?? '',
-            'description' => $_POST['description'] ?? '',
-            'meeting_day' => $_POST['meeting_day'] ?? '',
-            'meeting_time' => $_POST['meeting_time'] ?? '',
-            'meeting_address' => $_POST['meeting_address'] ?? '',
-            'neighborhood' => $_POST['neighborhood'] ?? '',
-            'max_participants' => $_POST['max_participants'] ?? '',
-            'ministry_id' => $_POST['ministry_id'] ?? null,
-            'leaders' => $_POST['leaders'] ?? [],
-            'latitude' => $_POST['latitude'] ?? null,
-            'longitude' => $_POST['longitude'] ?? null,
-            'active' => isset($_POST['active']) ? 1 : 0
-        ];
-    }
-
-    public function viewGroup($id): void
-    {
-        try {
-            $group = $this->groupModel->find($id);
-            if (!$group) {
-                $this->setFlash('error', 'Grupo não encontrado');
-                redirect('/groups');
-                return;
-            }
-
-            // Carregar participantes ativos
-            $participants = $this->groupModel->getParticipants($id);
-            
-            // Carregar reuniões com estatísticas
-            $meetings = $this->groupModel->getMeetings($id);
-
-            // Carregar líderes
-            $leaders = $this->groupModel->getGroupLeaders($id);
-
-            parent::view('groups/view', [
-                'group' => $group,
-                'participants' => $participants,
-                'meetings' => $meetings,
-                'leaders' => $leaders
-            ]);
-
-        } catch (\Exception $e) {
-            error_log("Error viewing group: " . $e->getMessage());
-            $this->setFlash('error', 'Erro ao carregar dados do grupo');
-            redirect('/groups');
+        } catch (Exception $e) {
+            error_log("[GroupController] Erro ao buscar detalhes do grupo: " . $e->getMessage());
+            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
+            $this->jsonResponse(['error' => 'Erro ao processar a requisição'], 500);
         }
     }
 
@@ -717,5 +608,22 @@ class GroupController extends Controller {
     {
         return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
                strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+    }
+
+    protected function getPostData(): array {
+        return [
+            'name' => $_POST['name'] ?? '',
+            'description' => $_POST['description'] ?? '',
+            'meeting_day' => $_POST['meeting_day'] ?? '',
+            'meeting_time' => $_POST['meeting_time'] ?? '',
+            'meeting_address' => $_POST['meeting_address'] ?? '',
+            'neighborhood' => $_POST['neighborhood'] ?? '',
+            'max_participants' => $_POST['max_participants'] ?? '',
+            'ministry_id' => $_POST['ministry_id'] ?? null,
+            'leaders' => $_POST['leaders'] ?? [],
+            'latitude' => $_POST['latitude'] ?? null,
+            'longitude' => $_POST['longitude'] ?? null,
+            'active' => isset($_POST['active']) ? 1 : 0
+        ];
     }
 }

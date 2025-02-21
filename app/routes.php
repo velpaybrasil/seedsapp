@@ -74,9 +74,10 @@ Router::group(['middleware' => ['auth', 'csrf']], function() {
     Router::post('/groups/{id}', [GroupController::class, 'update']);
     Router::post('/groups/{id}/delete', [GroupController::class, 'delete']);
     Router::get('/groups/heatmap', [GroupController::class, 'heatmap']);
+    Router::get('/groups/{id}', [GroupController::class, 'viewGroup']);
+    Router::post('/groups/{groupId}/participants/add', [GroupController::class, 'addParticipant']);
 
     // Rotas para gerenciamento de membros do grupo
-    Router::get('/groups/{id}', [GroupController::class, 'show']);
     Router::get('/groups/{groupId}/members/{userId}/approve', [GroupController::class, 'approveMember']);
     Router::get('/groups/{groupId}/members/{userId}/reject', [GroupController::class, 'rejectMember']);
 
