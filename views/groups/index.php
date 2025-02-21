@@ -175,7 +175,7 @@ View::section('styles'); ?>
                                                 <span class="text-muted">-</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td><?= View::escape($group['leader_name']) ?></td>
+                                        <td><?= $group['leaders'] ?: 'Sem líder' ?></td>
                                         <td><?= View::escape($group['neighborhood']) ?></td>
                                         <td>
                                             <?= View::escape($group['meeting_day']) ?> às <?= View::escape($group['meeting_time']) ?>

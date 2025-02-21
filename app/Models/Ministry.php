@@ -679,4 +679,17 @@ class Ministry extends Model {
             return [];
         }
     }
+
+    public static function getAll(): array {
+        try {
+            $db = static::getDB();
+            $sql = "SELECT * FROM " . static::$table . " ORDER BY name ASC";
+            $stmt = $db->prepare($sql);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("[Ministry] Error getting all ministries: " . $e->getMessage());
+            return [];
+        }
+    }
 }

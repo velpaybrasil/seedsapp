@@ -4,186 +4,144 @@ namespace App\Models;
 
 use App\Core\Model;
 use PDO;
-use PDOException;
 
-class GroupMember extends Model
-{
+class GroupMember extends Model {
     protected static string $table = 'group_members';
-
     protected static array $fillable = [
         'group_id',
-        'visitor_id',
+        'user_id',
         'status',
-        'role',
         'joined_at',
-        'notes'
+        'created_at',
+        'updated_at'
     ];
 
     /**
-     * Cria uma nova pré-inscrição para um grupo
+     * Adiciona um membro ao grupo
+     * @param int $groupId ID do grupo
+     * @param int $userId ID do usuário
+     * @return bool
      */
-    public static function createPreRegistration($groupId, $visitorId, $notes = null)
+    public static function addMember(int $groupId, int $userId): bool
     {
         try {
-            $db = static::getDB();
-            $db->beginTransaction();
-
-            // Verifica se já existe uma inscrição
-            $sql = "SELECT id, status FROM " . static::$table . "
-                    WHERE group_id = ? AND visitor_id = ?";
-            $stmt = $db->prepare($sql);
-            $stmt->execute([$groupId, $visitorId]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($existing) {
-                // Se já existe e foi rejeitada, permite nova inscrição
-                if ($existing['status'] === 'rejected') {
-                    $updateSql = "UPDATE " . static::$table . "
-                                SET status = 'pending', notes = ?, updated_at = CURRENT_TIMESTAMP
-                                WHERE id = ?";
-                    $stmt = $db->prepare($updateSql);
-                    $stmt->execute([$notes, $existing['id']]);
-                    
-                    $memberId = $existing['id'];
-                } else {
-                    throw new \Exception('Já existe uma inscrição para este visitante neste grupo');
-                }
-            } else {
-                // Cria nova inscrição
-                $sql = "INSERT INTO " . static::$table . "
-                        (group_id, visitor_id, status, role, notes)
-                        VALUES (?, ?, 'pending', 'member', ?)";
-                $stmt = $db->prepare($sql);
-                $stmt->execute([$groupId, $visitorId, $notes]);
-                
-                $memberId = $db->lastInsertId();
-            }
-
-            $db->commit();
-            return $memberId;
-
-        } catch (PDOException $e) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
-            }
-            error_log("[GroupMember] Error creating pre-registration: " . $e->getMessage());
-            throw $e;
+            $sql = "INSERT INTO " . static::$table . " (group_id, user_id) VALUES (:group_id, :user_id)";
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->bindValue(':group_id', $groupId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            return $stmt->execute();
+        } catch (\PDOException $e) {
+            error_log("[GroupMember] Erro ao adicionar membro: " . $e->getMessage());
+            return false;
         }
     }
 
     /**
-     * Atualiza o status de uma pré-inscrição
+     * Remove um membro do grupo
+     * @param int $groupId ID do grupo
+     * @param int $userId ID do usuário
+     * @return bool
      */
-    public static function updateStatus($memberId, $newStatus, $changedBy, $notes = null)
+    public static function removeMember(int $groupId, int $userId): bool
     {
         try {
-            $db = static::getDB();
-            $db->beginTransaction();
-
-            // Busca status atual
-            $sql = "SELECT status FROM " . static::$table . " WHERE id = ?";
-            $stmt = $db->prepare($sql);
-            $stmt->execute([$memberId]);
-            $currentStatus = $stmt->fetchColumn();
-
-            if (!$currentStatus) {
-                throw new \Exception('Membro não encontrado');
-            }
-
-            // Atualiza status
-            $updateSql = "UPDATE " . static::$table . "
-                        SET status = ?, 
-                            joined_at = " . ($newStatus === 'approved' ? 'CURRENT_TIMESTAMP' : 'NULL') . ",
-                            notes = ?
-                        WHERE id = ?";
-            $stmt = $db->prepare($updateSql);
-            $stmt->execute([$newStatus, $notes, $memberId]);
-
-            // Registra histórico
-            $historySql = "INSERT INTO group_member_history
-                          (member_id, old_status, new_status, changed_by, notes)
-                          VALUES (?, ?, ?, ?, ?)";
-            $stmt = $db->prepare($historySql);
-            $stmt->execute([$memberId, $currentStatus, $newStatus, $changedBy, $notes]);
-
-            $db->commit();
-            return true;
-
-        } catch (PDOException $e) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
-            }
-            error_log("[GroupMember] Error updating status: " . $e->getMessage());
-            throw $e;
+            $sql = "DELETE FROM " . static::$table . " WHERE group_id = :group_id AND user_id = :user_id";
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->bindValue(':group_id', $groupId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            return $stmt->execute();
+        } catch (\PDOException $e) {
+            error_log("[GroupMember] Erro ao remover membro: " . $e->getMessage());
+            return false;
         }
     }
 
     /**
-     * Busca pré-inscrições pendentes para um grupo
+     * Atualiza o status de um membro
+     * @param int $groupId ID do grupo
+     * @param int $userId ID do usuário
+     * @param string $status Novo status
+     * @return bool
      */
-    public static function getPendingMembers($groupId)
+    public static function updateStatus(int $groupId, int $userId, string $status): bool
     {
         try {
-            $db = static::getDB();
-            $sql = "SELECT gm.*, v.name as visitor_name, v.email, v.phone
-                    FROM " . static::$table . " gm
-                    INNER JOIN visitors v ON v.id = gm.visitor_id
-                    WHERE gm.group_id = ? AND gm.status = 'pending'
-                    ORDER BY gm.created_at DESC";
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute([$groupId]);
+            $sql = "UPDATE " . static::$table . " SET status = :status WHERE group_id = :group_id AND user_id = :user_id";
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->bindValue(':group_id', $groupId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':status', $status, PDO::PARAM_STR);
+            return $stmt->execute();
+        } catch (\PDOException $e) {
+            error_log("[GroupMember] Erro ao atualizar status: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Busca os membros de um grupo
+     * @param int $groupId ID do grupo
+     * @return array Lista de membros
+     */
+    public static function getGroupMembers(int $groupId): array
+    {
+        try {
+            $sql = "
+                SELECT m.*, u.name, u.email
+                FROM " . static::$table . " m
+                JOIN users u ON m.user_id = u.id
+                WHERE m.group_id = :group_id
+                ORDER BY u.name ASC
+            ";
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->bindValue(':group_id', $groupId, PDO::PARAM_INT);
+            $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        } catch (PDOException $e) {
-            error_log("[GroupMember] Error getting pending members: " . $e->getMessage());
-            throw $e;
+        } catch (\PDOException $e) {
+            error_log("[GroupMember] Erro ao buscar membros: " . $e->getMessage());
+            return [];
         }
     }
 
     /**
-     * Busca membros aprovados de um grupo
+     * Verifica se um usuário é membro de um grupo
+     * @param int $groupId ID do grupo
+     * @param int $userId ID do usuário
+     * @return bool
      */
-    public static function getApprovedMembers($groupId)
+    public static function isMember(int $groupId, int $userId): bool
     {
         try {
-            $db = static::getDB();
-            $sql = "SELECT gm.*, v.name as visitor_name, v.email, v.phone
-                    FROM " . static::$table . " gm
-                    INNER JOIN visitors v ON v.id = gm.visitor_id
-                    WHERE gm.group_id = ? AND gm.status = 'approved'
-                    ORDER BY gm.joined_at DESC";
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute([$groupId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        } catch (PDOException $e) {
-            error_log("[GroupMember] Error getting approved members: " . $e->getMessage());
-            throw $e;
+            $sql = "SELECT COUNT(*) as total FROM " . static::$table . " WHERE group_id = :group_id AND user_id = :user_id AND status = 'active'";
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->bindValue(':group_id', $groupId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int) $result['total'] > 0;
+        } catch (\PDOException $e) {
+            error_log("[GroupMember] Erro ao verificar membro: " . $e->getMessage());
+            return false;
         }
     }
 
     /**
-     * Busca histórico de status de um membro
+     * Conta o número de membros ativos de um grupo
+     * @param int $groupId ID do grupo
+     * @return int Número de membros
      */
-    public static function getMemberHistory($memberId)
+    public static function countActiveMembers(int $groupId): int
     {
         try {
-            $db = static::getDB();
-            $sql = "SELECT gmh.*, u.name as changed_by_name
-                    FROM group_member_history gmh
-                    INNER JOIN users u ON u.id = gmh.changed_by
-                    WHERE gmh.member_id = ?
-                    ORDER BY gmh.created_at DESC";
-            
-            $stmt = $db->prepare($sql);
-            $stmt->execute([$memberId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        } catch (PDOException $e) {
-            error_log("[GroupMember] Error getting member history: " . $e->getMessage());
-            throw $e;
+            $sql = "SELECT COUNT(*) as total FROM " . static::$table . " WHERE group_id = :group_id AND status = 'active'";
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->bindValue(':group_id', $groupId, PDO::PARAM_INT);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int) $result['total'];
+        } catch (\PDOException $e) {
+            error_log("[GroupMember] Erro ao contar membros: " . $e->getMessage());
+            return 0;
         }
     }
 }

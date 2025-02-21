@@ -43,7 +43,7 @@ class Group extends Model {
     }
 
     /**
-     * Busca grupos recentes com informações do líder
+     * Busca grupos recentes com informações dos líderes
      * @param int $limit Limite de registros
      * @return array Lista de grupos recentes
      */
@@ -51,13 +51,13 @@ class Group extends Model {
         try {
             $sql = "
                 SELECT g.*, 
-                       COALESCE(l.name, 'Sem líder') as leader_name,
-                       COALESCE(cl.name, 'Sem co-líder') as co_leader_name,
-                       m.name as ministry_name
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
                 FROM " . static::$table . " g
-                LEFT JOIN users l ON g.leader_id = l.id
-                LEFT JOIN users cl ON g.co_leader_id = cl.id
                 LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
+                GROUP BY g.id
                 ORDER BY g.created_at DESC
                 LIMIT :limit
             ";
@@ -74,26 +74,56 @@ class Group extends Model {
     }
 
     /**
-     * Busca grupos ativos com informações do líder
+     * Busca todos os grupos com informações dos líderes
+     * @return array Lista de grupos
+     */
+    public static function getAllGroups(): array {
+        try {
+            $sql = "
+                SELECT g.*, 
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
+                FROM " . static::$table . " g
+                LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
+                GROUP BY g.id
+                ORDER BY g.name ASC
+            ";
+            
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->execute();
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[Group] Erro ao buscar todos os grupos: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Busca grupos ativos com informações dos líderes
      * @return array Lista de grupos ativos
      */
     public static function getActiveGroups(): array {
         try {
             $sql = "
                 SELECT g.*, 
-                       COALESCE(l.name, 'Sem líder') as leader_name,
-                       COALESCE(cl.name, 'Sem co-líder') as co_leader_name,
-                       m.name as ministry_name
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
                 FROM " . static::$table . " g
-                LEFT JOIN users l ON g.leader_id = l.id
-                LEFT JOIN users cl ON g.co_leader_id = cl.id
                 LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
                 WHERE g.status = 'active'
+                GROUP BY g.id
                 ORDER BY g.name ASC
             ";
+            
             $stmt = self::getDB()->prepare($sql);
             $stmt->execute();
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\PDOException $e) {
             error_log("[Group] Erro ao buscar grupos ativos: " . $e->getMessage());
             return [];
@@ -109,20 +139,22 @@ class Group extends Model {
         try {
             $sql = "
                 SELECT g.*, 
-                       COALESCE(l.name, 'Sem líder') as leader_name,
-                       COALESCE(cl.name, 'Sem co-líder') as co_leader_name,
-                       m.name as ministry_name
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
                 FROM " . static::$table . " g
-                LEFT JOIN users l ON g.leader_id = l.id
-                LEFT JOIN users cl ON g.co_leader_id = cl.id
                 LEFT JOIN ministries m ON g.ministry_id = m.id
-                WHERE g.leader_id = :leader_id
+                LEFT JOIN group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
+                WHERE gl.user_id = :leader_id
+                GROUP BY g.id
                 ORDER BY g.created_at DESC
             ";
+            
             $stmt = self::getDB()->prepare($sql);
             $stmt->bindValue(':leader_id', $leaderId, \PDO::PARAM_INT);
             $stmt->execute();
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\PDOException $e) {
             error_log("[Group] Erro ao buscar grupos do líder: " . $e->getMessage());
             return [];
@@ -130,29 +162,31 @@ class Group extends Model {
     }
 
     /**
-     * Busca um grupo com informações do líder
+     * Busca um grupo com informações dos líderes
      * @param int $id ID do grupo
      * @return array|null Dados do grupo ou null se não encontrado
      */
-    public static function getGroupWithLeader(int $id): ?array {
+    public static function getGroupWithLeaders(int $id): ?array {
         try {
             $sql = "
                 SELECT g.*, 
-                       COALESCE(l.name, 'Sem líder') as leader_name,
-                       COALESCE(cl.name, 'Sem co-líder') as co_leader_name,
-                       m.name as ministry_name
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
                 FROM " . static::$table . " g
-                LEFT JOIN users l ON g.leader_id = l.id
-                LEFT JOIN users cl ON g.co_leader_id = cl.id
                 LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
                 WHERE g.id = :id
+                GROUP BY g.id
             ";
+            
             $stmt = self::getDB()->prepare($sql);
             $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
             $stmt->execute();
-            return $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+            
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         } catch (\PDOException $e) {
-            error_log("[Group] Erro ao buscar grupo com líder: " . $e->getMessage());
+            error_log("[Group] Erro ao buscar grupo com líderes: " . $e->getMessage());
             return null;
         }
     }
@@ -185,8 +219,10 @@ class Group extends Model {
             
             // Conta total de registros
             $countSql = "
-                SELECT COUNT(*) as total 
+                SELECT COUNT(DISTINCT g.id) as total 
                 FROM " . static::$table . " g
+                LEFT JOIN group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
                 {$where}
             ";
             
@@ -203,14 +239,14 @@ class Group extends Model {
             // Busca grupos
             $sql = "
                 SELECT g.*, 
-                       COALESCE(l.name, 'Sem líder') as leader_name,
-                       COALESCE(cl.name, 'Sem co-líder') as co_leader_name,
-                       m.name as ministry_name
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
                 FROM " . static::$table . " g
-                LEFT JOIN users l ON g.leader_id = l.id
-                LEFT JOIN users cl ON g.co_leader_id = cl.id
                 LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
                 {$where}
+                GROUP BY g.id
                 ORDER BY g.created_at DESC
                 LIMIT :limit OFFSET :offset
             ";

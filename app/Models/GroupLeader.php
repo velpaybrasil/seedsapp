@@ -6,7 +6,7 @@ use App\Core\Model;
 use PDO;
 
 class GroupLeader extends Model {
-    protected static string $table = 'group_leaders';
+    protected static string $table = 'growth_group_leaders';
     protected static array $fillable = [
         'group_id',
         'user_id',

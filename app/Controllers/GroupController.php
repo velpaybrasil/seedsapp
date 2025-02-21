@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Visitor;
 use App\Models\Ministry;
 use App\Models\GroupLeader;
+use App\Models\GroupMember;
 use App\Core\Database\Database;
 use Exception;
 use PDOException;
@@ -20,6 +21,7 @@ class GroupController extends Controller {
     protected Visitor $visitorModel;
     protected Ministry $ministryModel;
     protected GroupLeader $groupLeaderModel;
+    protected GroupMember $groupMemberModel;
     protected Database $db;
     protected Session $session;
 
@@ -30,71 +32,22 @@ class GroupController extends Controller {
         $this->ministryModel = new Ministry();
         $this->userModel = new User();
         $this->groupLeaderModel = new GroupLeader();
+        $this->groupMemberModel = new GroupMember();
         $this->session = new Session();
     }
 
     public function index(): void {
         try {
-            // Get ministries for the dropdown
+            $groups = $this->groupModel->getAllGroups();
             $ministries = $this->ministryModel->getAll();
             
-            // Get active groups ordered by name
-            $groups = $this->groupModel->getAllActive();
-            
-            // Format data for display
-            foreach ($groups as &$group) {
-                try {
-                    // Get and format leaders - handle missing table gracefully
-                    try {
-                        $leaders = $this->groupLeaderModel->getGroupLeaders($group['id']);
-                        $group['leader_name'] = 'Sem líder';
-                        $leaderNames = [];
-                        
-                        foreach ($leaders as $leader) {
-                            if ($leader['role'] === 'leader') {
-                                $group['leader_name'] = $leader['name'];
-                            }
-                            $role = $leader['role'] === 'leader' ? 'Líder' : 'Co-líder';
-                            $leaderNames[] = $leader['name'] . " ($role)";
-                        }
-                        
-                        $group['leaders'] = !empty($leaderNames) ? implode(', ', $leaderNames) : 'Sem líder';
-                    } catch (PDOException $e) {
-                        if (strpos($e->getMessage(), "Table 'group_leaders' doesn't exist") !== false) {
-                            $group['leader_name'] = 'Sem líder';
-                            $group['leaders'] = 'Sem líder';
-                        } else {
-                            throw $e;
-                        }
-                    }
-                    
-                    // Get ministry name
-                    if (!empty($group['ministry_id'])) {
-                        $ministry = $this->ministryModel->find($group['ministry_id']);
-                        $group['ministry_name'] = $ministry ? $ministry['name'] : 'Sem ministério';
-                    } else {
-                        $group['ministry_name'] = 'Sem ministério';
-                    }
-
-                    // Format meeting time
-                    if (!empty($group['meeting_time'])) {
-                        $group['meeting_time'] = date('H:i', strtotime($group['meeting_time']));
-                    }
-                } catch (Exception $e) {
-                    error_log("[GroupController] Erro ao formatar grupo {$group['id']}: " . $e->getMessage());
-                    // Continue with next group if there's an error formatting one
-                    continue;
-                }
-            }
-            
-            View::render('groups/index', [
+            $this->view('groups/index', [
+                'title' => 'Grupos de Crescimento',
                 'groups' => $groups,
                 'ministries' => $ministries
             ]);
-        } catch (Exception $e) {
-            error_log("[GroupController] Erro ao carregar a lista de grupos: " . $e->getMessage());
-            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-            $this->setFlash('error', 'Erro ao carregar a lista de grupos');
+        } catch (\Exception $e) {
+            $this->setFlash('error', $e->getMessage());
             $this->redirect('/dashboard');
         }
     }
@@ -454,38 +407,20 @@ class GroupController extends Controller {
         }
     }
 
-    public function show(int $id): void
-    {
+    public function show(int $id): void {
         try {
             $group = $this->groupModel->find($id);
             if (!$group) {
-                $this->jsonResponse(['error' => 'Grupo não encontrado'], 404);
-                return;
+                throw new \Exception('Grupo não encontrado');
             }
 
-            // Get leaders with full information
-            $leaders = $this->groupLeaderModel->getGroupLeaders($id);
-
-            // Get ministry information
-            $ministry = null;
-            if (!empty($group['ministry_id'])) {
-                $ministry = $this->ministryModel->find($group['ministry_id']);
-            }
-
-            // Format meeting time
-            if (!empty($group['meeting_time'])) {
-                $group['meeting_time'] = date('H:i', strtotime($group['meeting_time']));
-            }
-
-            $this->jsonResponse([
-                'group' => $group,
-                'leaders' => $leaders,
-                'ministry' => $ministry
+            $this->view('groups/show', [
+                'title' => 'Detalhes do Grupo',
+                'group' => $group
             ]);
-        } catch (Exception $e) {
-            error_log("[GroupController] Erro ao buscar detalhes do grupo: " . $e->getMessage());
-            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-            $this->jsonResponse(['error' => 'Erro ao processar a requisição'], 500);
+        } catch (\Exception $e) {
+            $this->setFlash('error', $e->getMessage());
+            $this->redirect('/groups');
         }
     }
 
@@ -625,5 +560,104 @@ class GroupController extends Controller {
             'longitude' => $_POST['longitude'] ?? null,
             'active' => isset($_POST['active']) ? 1 : 0
         ];
+    }
+
+    /**
+     * Adiciona um membro ao grupo
+     */
+    public function addMember(int $groupId, int $userId): void {
+        try {
+            // Valida se o grupo existe
+            $group = $this->groupModel->find($groupId);
+            if (!$group) {
+                throw new \Exception('Grupo não encontrado');
+            }
+
+            // Valida se ainda há vagas
+            $currentMembers = $this->groupMemberModel->countActiveMembers($groupId);
+            if ($currentMembers >= $group['max_participants']) {
+                throw new \Exception('Grupo está cheio');
+            }
+
+            // Adiciona o membro
+            if (!$this->groupMemberModel->addMember($groupId, $userId)) {
+                throw new \Exception('Erro ao adicionar membro');
+            }
+
+            $this->setFlash('success', 'Membro adicionado com sucesso!');
+            $this->redirect("/groups/{$groupId}");
+        } catch (\Exception $e) {
+            $this->setFlash('error', $e->getMessage());
+            $this->redirect("/groups/{$groupId}");
+        }
+    }
+
+    /**
+     * Remove um membro do grupo
+     */
+    public function removeMember(int $groupId, int $userId): void {
+        try {
+            // Remove o membro
+            if (!$this->groupMemberModel->removeMember($groupId, $userId)) {
+                throw new \Exception('Erro ao remover membro');
+            }
+
+            $this->setFlash('success', 'Membro removido com sucesso!');
+            $this->redirect("/groups/{$groupId}");
+        } catch (\Exception $e) {
+            $this->setFlash('error', $e->getMessage());
+            $this->redirect("/groups/{$groupId}");
+        }
+    }
+
+    /**
+     * Atualiza o status de um membro
+     */
+    public function updateMemberStatus(int $groupId, int $userId, string $status): void {
+        try {
+            // Atualiza o status
+            if (!in_array($status, ['active', 'inactive'])) {
+                throw new \Exception('Status inválido');
+            }
+
+            if (!$this->groupMemberModel->updateStatus($groupId, $userId, $status)) {
+                throw new \Exception('Erro ao atualizar status');
+            }
+
+            $this->setFlash('success', 'Status atualizado com sucesso!');
+            $this->redirect("/groups/{$groupId}");
+        } catch (\Exception $e) {
+            $this->setFlash('error', $e->getMessage());
+            $this->redirect("/groups/{$groupId}");
+        }
+    }
+
+    /**
+     * Lista os membros de um grupo
+     */
+    public function members(int $groupId): void {
+        try {
+            // Busca o grupo
+            $group = $this->groupModel->find($groupId);
+            if (!$group) {
+                throw new \Exception('Grupo não encontrado');
+            }
+
+            // Busca os membros
+            $members = $this->groupMemberModel->getGroupMembers($groupId);
+
+            // Busca usuários para adicionar
+            $users = $this->userModel->getAll();
+
+            $this->view('groups/members', [
+                'title' => 'Membros do Grupo',
+                'group' => $group,
+                'members' => $members,
+                'users' => $users
+            ]);
+        } catch (\Exception $e) {
+            $this->setFlash('error', $e->getMessage());
+            $this->redirect('/groups');
+        }
     }
 }

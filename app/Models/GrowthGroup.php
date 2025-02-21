@@ -647,15 +647,89 @@ class GrowthGroup extends Model
         }
     }
 
-    public static function getAllActive()
+    /**
+     * Busca todos os grupos com informações dos líderes
+     * @return array Lista de grupos
+     */
+    public static function getAllGroups(): array {
+        try {
+            $sql = "
+                SELECT g.*, 
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
+                FROM " . static::$table . " g
+                LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN growth_group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
+                GROUP BY g.id
+                ORDER BY g.name ASC
+            ";
+            
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->execute();
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao buscar todos os grupos: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Busca grupos recentes com informações dos líderes
+     * @param int $limit Limite de registros
+     * @return array Lista de grupos recentes
+     */
+    public static function getRecentGroups(int $limit = 5): array {
+        try {
+            $sql = "
+                SELECT g.*, 
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
+                FROM " . static::$table . " g
+                LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN growth_group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
+                GROUP BY g.id
+                ORDER BY g.created_at DESC
+                LIMIT :limit
+            ";
+            
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao buscar grupos recentes: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public static function getAllActive(): array
     {
-        $db = static::getDB();
-        $sql = "SELECT * FROM " . static::$table . " 
-                WHERE status = 'active' 
-                ORDER BY name ASC";
-        $stmt = $db->prepare($sql);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $sql = "
+                SELECT g.*, 
+                       m.name as ministry_name,
+                       GROUP_CONCAT(DISTINCT CONCAT(u.name, ' (', CASE WHEN gl.role = 'leader' THEN 'Líder' ELSE 'Co-líder' END, ')') SEPARATOR ', ') as leaders
+                FROM " . static::$table . " g
+                LEFT JOIN ministries m ON g.ministry_id = m.id
+                LEFT JOIN growth_group_leaders gl ON g.id = gl.group_id
+                LEFT JOIN users u ON gl.user_id = u.id
+                WHERE g.status = 'active'
+                GROUP BY g.id
+                ORDER BY g.name ASC
+            ";
+            
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->execute();
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[GrowthGroup] Erro ao buscar grupos ativos: " . $e->getMessage());
+            return [];
+        }
     }
 
     public static function getGroupMembers($groupId): array {

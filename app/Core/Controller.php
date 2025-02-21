@@ -67,15 +67,12 @@ abstract class Controller
             $data['flash'] = $flash;
         }
 
-        // Extract data to make variables available in view
-        extract($data);
-
-        // Include the view file
-        $viewFile = $this->viewPath . "/{$view}.php";
-        if (file_exists($viewFile)) {
-            require $viewFile;
-        } else {
-            throw new \RuntimeException("View file not found: {$viewFile}");
+        try {
+            View::render($view, $data);
+        } catch (\Exception $e) {
+            error_log("Error rendering view: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            throw $e;
         }
     }
 

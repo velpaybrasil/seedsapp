@@ -36,10 +36,6 @@ class View {
             $content = ob_get_clean();
             
             // If we have a layout, render it with the content
-            if ($layout && self::$extends) {
-                $layout = self::$extends;
-            }
-            
             if ($layout) {
                 // Store the content in a section if not already set
                 if (!isset(self::$sections['content'])) {
@@ -103,7 +99,19 @@ class View {
     }
     
     public static function extends(string $layout): void {
-        self::$extends = $layout;
+        try {
+            // Check if layout file exists
+            $layoutFile = self::$viewsPath . '/layouts/' . $layout . '.php';
+            if (!file_exists($layoutFile)) {
+                error_log("[View] Layout file not found: {$layoutFile}");
+                throw new \Exception("Layout não encontrado: {$layout}");
+            }
+            self::$extends = $layout;
+        } catch (\Exception $e) {
+            error_log('[View] Erro ao definir layout: ' . $e->getMessage());
+            error_log('[View] Stack trace: ' . $e->getTraceAsString());
+            throw $e;
+        }
     }
     
     public static function renderPartial(string $view, array $data = []): void {

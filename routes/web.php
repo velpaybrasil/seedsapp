@@ -79,6 +79,12 @@ Router::group(['middleware' => ['auth']], function() {
     Router::put('/groups/{id}', [GrowthGroupController::class, 'update']);
     Router::delete('/groups/{id}', [GrowthGroupController::class, 'delete']);
 
+    // Rotas para membros dos grupos
+    Router::get('/groups/{id}/members', [GrowthGroupController::class, 'members']);
+    Router::post('/groups/{id}/members/add', [GrowthGroupController::class, 'addMember']);
+    Router::post('/groups/{id}/members/remove', [GrowthGroupController::class, 'removeMember']);
+    Router::post('/groups/{id}/members/status', [GrowthGroupController::class, 'updateMemberStatus']);
+
     // Outras rotas protegidas...
     // Rotas de Ministérios
     Router::get('/ministries', [MinistryController::class, 'index']);
