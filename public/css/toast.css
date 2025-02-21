@@ -1,0 +1,59 @@
+.toast-container {
+    z-index: 1060;
+}
+
+.toast {
+    min-width: 250px;
+    max-width: 350px;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
+    opacity: 1 !important;
+}
+
+.toast.show {
+    animation: toast-in-right 0.3s ease-in-out;
+}
+
+@keyframes toast-in-right {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+.toast.hide {
+    animation: toast-out-right 0.3s ease-in-out forwards;
+}
+
+@keyframes toast-out-right {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(100%);
+    }
+}
+
+/* Custom styles for different types */
+.toast.bg-success {
+    background-color: #1cc88a !important;
+}
+
+.toast.bg-danger {
+    background-color: #e74a3b !important;
+}
+
+.toast.bg-warning {
+    background-color: #f6c23e !important;
+}
+
+.toast.bg-info {
+    background-color: #36b9cc !important;
+}
+
+/* Ensure close button is visible on dark backgrounds */
+.toast .btn-close-white {
+    filter: brightness(0) invert(1);
+}

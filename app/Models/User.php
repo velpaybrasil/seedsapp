@@ -18,6 +18,32 @@ class User {
         return Database::fetch($sql, ['id' => $id]);
     }
 
+    public function findAll(array $conditions = [], array $orderBy = []): array {
+        $sql = "SELECT * FROM {$this->table}";
+        $params = [];
+
+        // Adicionar condições WHERE
+        if (!empty($conditions)) {
+            $whereConditions = [];
+            foreach ($conditions as $field => $value) {
+                $whereConditions[] = "$field = :$field";
+                $params[$field] = $value;
+            }
+            $sql .= " WHERE " . implode(' AND ', $whereConditions);
+        }
+
+        // Adicionar ordenação
+        if (!empty($orderBy)) {
+            $orderClauses = [];
+            foreach ($orderBy as $field => $direction) {
+                $orderClauses[] = "$field $direction";
+            }
+            $sql .= " ORDER BY " . implode(', ', $orderClauses);
+        }
+
+        return Database::fetchAll($sql, $params);
+    }
+
     public function findByEmail(string $email): ?array {
         $sql = "SELECT * FROM {$this->table} WHERE email = :email";
         return Database::fetch($sql, ['email' => $email]);
@@ -242,5 +268,107 @@ class User {
         }
         
         return $users;
+    }
+
+    public function getUserRoles(int $userId): array {
+        $sql = "SELECT r.* 
+                FROM roles r
+                INNER JOIN user_roles ur ON r.id = ur.role_id
+                WHERE ur.user_id = :user_id";
+        return Database::fetchAll($sql, ['user_id' => $userId]);
+    }
+
+    public function assignRoles(int $userId, array $roleIds): bool {
+        try {
+            // Remover papéis existentes
+            $sql = "DELETE FROM user_roles WHERE user_id = :user_id";
+            Database::execute($sql, ['user_id' => $userId]);
+
+            // Adicionar novos papéis
+            if (!empty($roleIds)) {
+                $values = implode(',', array_fill(0, count($roleIds), '(?, ?)'));
+                $params = [];
+                foreach ($roleIds as $roleId) {
+                    $params[] = $userId;
+                    $params[] = $roleId;
+                }
+
+                $sql = "INSERT INTO user_roles (user_id, role_id) VALUES {$values}";
+                Database::execute($sql, $params);
+            }
+
+            return true;
+        } catch (\PDOException $e) {
+            error_log('Erro ao atribuir papéis ao usuário: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updateRoles(int $userId, array $roleIds): bool {
+        return $this->assignRoles($userId, $roleIds);
+    }
+
+    public function getUserPermissions(int $userId): array {
+        $sql = "SELECT DISTINCT p.id, p.name, p.slug, p.module_id
+                FROM permissions p
+                JOIN role_permissions rp ON p.id = rp.permission_id
+                JOIN user_roles ur ON rp.role_id = ur.role_id
+                WHERE ur.user_id = :user_id";
+        return Database::fetchAll($sql, ['user_id' => $userId]);
+    }
+
+    public function updateSettings($userId, $data) {
+        try {
+            // Verificar se as colunas existem
+            $columns = $this->getTableColumns();
+            $hasTheme = in_array('theme', $columns);
+            $hasNotifications = in_array('notifications_enabled', $columns);
+            $hasEmailNotifications = in_array('email_notifications', $columns);
+            
+            // Construir a query dinamicamente
+            $updates = [];
+            $params = ['id' => $userId];
+            
+            if ($hasTheme) {
+                $updates[] = "theme = :theme";
+                $params['theme'] = $data['theme'];
+            }
+            
+            if ($hasNotifications) {
+                $updates[] = "notifications_enabled = :notifications_enabled";
+                $params['notifications_enabled'] = $data['notifications_enabled'];
+            }
+            
+            if ($hasEmailNotifications) {
+                $updates[] = "email_notifications = :email_notifications";
+                $params['email_notifications'] = $data['email_notifications'];
+            }
+            
+            if (empty($updates)) {
+                return true; // Nenhuma coluna para atualizar
+            }
+            
+            $updates[] = "updated_at = CURRENT_TIMESTAMP";
+            
+            $sql = "UPDATE users SET " . implode(", ", $updates) . " WHERE id = :id";
+            $stmt = $this->db->prepare($sql);
+            
+            return $stmt->execute($params);
+        } catch (\PDOException $e) {
+            error_log('Erro ao atualizar configurações do usuário: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
+    private function getTableColumns() {
+        try {
+            $sql = "SHOW COLUMNS FROM users";
+            $stmt = $this->db->query($sql);
+            $columns = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            return array_map('strtolower', $columns);
+        } catch (\PDOException $e) {
+            error_log('Erro ao obter colunas da tabela users: ' . $e->getMessage());
+            return [];
+        }
     }
 }

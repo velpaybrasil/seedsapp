@@ -1,0 +1,24 @@
+Para habilitar o suporte ao MySQL no PHP, siga estes passos:
+
+1. Localize o arquivo php.ini:
+   - Abra o terminal e execute: php --ini
+   - Procure por "Loaded Configuration File"
+
+2. Edite o php.ini:
+   - Procure por "extension=pdo_mysql"
+   - Remova o ponto e vírgula (;) do início da linha para descomentar
+   - Se a linha não existir, adicione: extension=pdo_mysql
+
+3. Reinicie o servidor web (Apache/Nginx) se estiver usando um
+
+4. Para verificar se a extensão foi carregada:
+   - Execute: php database/check_php.php
+   - Procure por "Extensão pdo_mysql está carregada"
+
+Se você estiver no Windows:
+1. Verifique se o arquivo php_pdo_mysql.dll existe na pasta ext do PHP
+2. Se não existir, baixe a versão correta do PHP para Windows em php.net
+3. Copie o arquivo php_pdo_mysql.dll para a pasta ext
+4. Edite o php.ini conforme as instruções acima
+
+Se precisar de ajuda, forneça a saída do comando: php --ini

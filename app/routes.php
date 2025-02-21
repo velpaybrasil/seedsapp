@@ -12,6 +12,8 @@ use App\Controllers\ReportController;
 use App\Controllers\PublicController;
 use App\Controllers\PrayerRequestController;
 use App\Controllers\SystemModuleController;
+use App\Controllers\SettingsController;
+use App\Controllers\VisitorFormController;
 
 // Debug
 error_log('Loading routes...');
@@ -31,11 +33,22 @@ Router::post('/visitor-form/store', [PublicController::class, 'storeVisitor']); 
 Router::get('/visitor-form/success', [PublicController::class, 'success']); // Rota alternativa
 
 // Rotas protegidas
-Router::group(['middleware' => 'auth'], function() {
+Router::group(['middleware' => ['auth', 'csrf']], function() {
     error_log('Setting up protected routes...');
 
     // Dashboard
     Router::get('/dashboard', [DashboardController::class, 'index']);
+
+    // Profile routes
+    Router::get('/profile', [ProfileController::class, 'showProfile']);
+    Router::post('/profile/update', [ProfileController::class, 'updateProfile']);
+
+    // Settings routes
+    Router::get('/settings', [SettingsController::class, 'index']);
+    Router::get('/settings/profile', [SettingsController::class, 'profile']);
+    Router::post('/settings/profile', [SettingsController::class, 'updateProfile']);
+    Router::post('/settings/password', [SettingsController::class, 'updatePassword']);
+    Router::post('/settings/notifications', [SettingsController::class, 'updateNotifications']);
 
     // Usuários
     Router::get('/users', [UserController::class, 'index']);
@@ -60,20 +73,36 @@ Router::group(['middleware' => 'auth'], function() {
     Router::get('/groups/{id}/edit', [GroupController::class, 'edit']);
     Router::post('/groups/{id}', [GroupController::class, 'update']);
     Router::post('/groups/{id}/delete', [GroupController::class, 'delete']);
-    Router::get('/groups/{id}', [GroupController::class, 'show']);
     Router::get('/groups/heatmap', [GroupController::class, 'heatmap']);
+
+    // Rotas para gerenciamento de membros do grupo
+    Router::get('/groups/{id}', [GroupController::class, 'show']);
+    Router::get('/groups/{groupId}/members/{userId}/approve', [GroupController::class, 'approveMember']);
+    Router::get('/groups/{groupId}/members/{userId}/reject', [GroupController::class, 'rejectMember']);
 
     // Visitantes
     Router::get('/visitors', [VisitorController::class, 'index']);
     Router::get('/visitors/create', [VisitorController::class, 'create']);
     Router::post('/visitors', [VisitorController::class, 'store']);
-    Router::get('/visitors/{id}', [VisitorController::class, 'show']); 
+    Router::get('/visitors/{id}', [VisitorController::class, 'show']);
     Router::get('/visitors/{id}/edit', [VisitorController::class, 'edit']);
     Router::post('/visitors/{id}', [VisitorController::class, 'update']);
     Router::post('/visitors/{id}/delete', [VisitorController::class, 'delete']);
     Router::get('/visitors/{id}/contact-logs', [VisitorController::class, 'getContactLogs']);
     Router::post('/visitors/{id}/contact-logs', [VisitorController::class, 'addContactLog']);
     Router::post('/visitors/{id}/contact-logs/{logId}/status', [VisitorController::class, 'updateFollowUpStatus']);
+
+    // Formulários de Visitantes
+    Router::get('/visitor-forms', [VisitorFormController::class, 'index']);
+    Router::get('/visitor-forms/create', [VisitorFormController::class, 'create']);
+    Router::post('/visitor-forms', [VisitorFormController::class, 'store']);
+    Router::get('/visitor-forms/{id}', [VisitorFormController::class, 'show']);
+    Router::get('/visitor-forms/{id}/edit', [VisitorFormController::class, 'edit']);
+    Router::post('/visitor-forms/{id}', [VisitorFormController::class, 'update']);
+    Router::post('/visitor-forms/{id}/delete', [VisitorFormController::class, 'delete']);
+    Router::post('/visitor-forms/{id}/fields', [VisitorFormController::class, 'addField']);
+    Router::put('/visitor-forms/{id}/fields/{fieldId}', [VisitorFormController::class, 'updateField']);
+    Router::delete('/visitor-forms/{id}/fields/{fieldId}', [VisitorFormController::class, 'deleteField']);
 
     // Rotas para gerenciamento de participantes do grupo
     Router::get('/visitors/search', [VisitorController::class, 'search']);
