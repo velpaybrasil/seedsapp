@@ -1,1 +1,13 @@
-teste_git
+Gere um comando sql de usuário para administradores
+
+cintiambslima@gmail.com senha 123456789 nome Cintia Lima
+ceo@alfadev.online senha 123456789 nome Paulo Gustavo
+mateushenrique@ccvideira.com.br senha 1234567489 Mateus Henrique
+
+
+
+8m² - R$ 1.040
+10m² - R$ 1.300,00
+
+
+262626
