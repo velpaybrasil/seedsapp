@@ -69,7 +69,7 @@ class User extends Model {
             self::resetFailedAttempts($user['id']);
             
             // Busca os papéis do usuário
-            $user['roles'] = self::getUserRoles($user['id']);
+            $user['roles'] = self::getUserRoles($user['id']) ?? [];
             
             return $user;
         } catch (\PDOException $e) {
@@ -504,53 +504,51 @@ class User extends Model {
         try {
             $db = self::getDB();
             $offset = ($page - 1) * $perPage;
-            
-            $where = [];
             $params = [];
             
+            // Base query
+            $sql = "SELECT u.* FROM " . static::$table . " u";
+            
+            // Where conditions
+            $where = [];
             if ($search) {
                 $where[] = "(u.name LIKE :search OR u.email LIKE :search)";
                 $params['search'] = "%{$search}%";
             }
-            
             if ($status !== null) {
                 $where[] = "u.active = :status";
-                $params['status'] = $status === 'active' ? 1 : 0;
+                $params['status'] = $status;
             }
             
-            $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+            // Add where clause if conditions exist
+            if (!empty($where)) {
+                $sql .= " WHERE " . implode(" AND ", $where);
+            }
             
             // Count total records
-            $countSql = "SELECT COUNT(DISTINCT u.id) as total 
-                        FROM " . static::$table . " u 
-                        LEFT JOIN user_roles ur ON u.id = ur.user_id 
-                        LEFT JOIN roles r ON ur.role_id = r.id 
-                        {$whereClause}";
-            
+            $countSql = str_replace("u.*", "COUNT(*) as total", $sql);
             $stmt = $db->prepare($countSql);
             $stmt->execute($params);
             $total = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
             
             // Get paginated records
-            $sql = "SELECT u.*, GROUP_CONCAT(r.name) as roles 
-                   FROM " . static::$table . " u 
-                   LEFT JOIN user_roles ur ON u.id = ur.user_id 
-                   LEFT JOIN roles r ON ur.role_id = r.id 
-                   {$whereClause} 
-                   GROUP BY u.id 
-                   ORDER BY u.created_at DESC 
-                   LIMIT :limit OFFSET :offset";
-            
+            $sql .= " ORDER BY u.created_at DESC LIMIT :offset, :limit";
             $stmt = $db->prepare($sql);
-            $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
             
+            // Bind all parameters
             foreach ($params as $key => $value) {
-                $stmt->bindValue($key, $value);
+                $stmt->bindValue(":{$key}", $value);
             }
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
             
             $stmt->execute();
             $users = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Get roles for each user
+            foreach ($users as &$user) {
+                $user['roles'] = self::getUserRoles($user['id']) ?? [];
+            }
             
             return [
                 'users' => $users,

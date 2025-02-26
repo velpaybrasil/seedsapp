@@ -245,11 +245,17 @@ View::section('styles'); ?>
                             </td>
                             <td><?= htmlspecialchars($user['email']) ?></td>
                             <td>
-                                <?php foreach ($user['roles'] as $role): ?>
-                                    <span class="badge bg-primary role-badge mb-1">
-                                        <?= htmlspecialchars($role['name']) ?>
-                                    </span>
-                                <?php endforeach; ?>
+                                <?php 
+                                $roles = $user['roles'] ?? [];
+                                if (!empty($roles)): 
+                                    foreach ($roles as $role): ?>
+                                        <span class="badge bg-primary role-badge mb-1">
+                                            <?= htmlspecialchars($role['name']) ?>
+                                        </span>
+                                    <?php endforeach;
+                                else: ?>
+                                    <span class="badge bg-secondary">Sem papel definido</span>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <span class="badge bg-<?= $user['active'] ? 'success' : 'danger' ?>">
