@@ -24,45 +24,56 @@ class AuthController extends Controller {
     }
 
     public function login(): void {
-        error_log('Login method called');
+        error_log('[AuthController] Iniciando processo de login');
         if (!$this->isPost()) {
             $this->redirect('/login');
+            return;
         }
 
-        $email = $_POST['email'] ?? '';
+        $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
         $remember = isset($_POST['remember']);
 
         try {
-            // Valida os dados
-            $errors = $this->validateInput(
-                ['email' => $email, 'password' => $password],
-                ['email' => 'required|email', 'password' => 'required|min:6']
-            );
-
-            if (!empty($errors)) {
-                error_log('Validation errors: ' . json_encode($errors));
-                $this->setFlash('error', 'Por favor, corrija os erros no formulário: ' . implode(', ', $errors));
+            error_log('[AuthController] Validando dados de entrada');
+            
+            // Valida os dados básicos
+            if (empty($email) || empty($password)) {
+                error_log('[AuthController] Email ou senha vazios');
+                $this->setFlash('error', 'Por favor, preencha todos os campos.');
                 $this->redirect('/login');
                 return;
             }
 
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                error_log('[AuthController] Email inválido: ' . $email);
+                $this->setFlash('error', 'Por favor, forneça um email válido.');
+                $this->redirect('/login');
+                return;
+            }
+
+            error_log('[AuthController] Tentando autenticar usuário');
+            
             // Tenta autenticar o usuário
             $user = User::validateLogin($email, $password);
-            error_log('User validation result: ' . ($user ? 'Success' : 'Failure'));
+            error_log('[AuthController] Resultado da autenticação: ' . ($user ? 'Sucesso' : 'Falha'));
 
             if (!$user) {
-                $this->setFlash('error', 'Email ou senha inválidos. Por favor, verifique suas credenciais.');
+                $this->setFlash('error', 'Email ou senha inválidos.');
                 $this->redirect('/login');
                 return;
             }
 
             // Verifica se a conta está bloqueada
             if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
-                $this->setFlash('error', 'Conta temporariamente bloqueada. Tente novamente mais tarde.');
+                $lockTime = strtotime($user['locked_until']) - time();
+                $minutes = ceil($lockTime / 60);
+                $this->setFlash('error', "Conta temporariamente bloqueada. Tente novamente em {$minutes} minutos.");
                 $this->redirect('/login');
                 return;
             }
+
+            error_log('[AuthController] Usuário autenticado, configurando sessão');
 
             // Busca as permissões do usuário
             $permissions = User::getUserPermissions($user['id']);
@@ -77,21 +88,23 @@ class AuthController extends Controller {
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_permissions'] = $permissions;
             $_SESSION['user_theme'] = $user['theme'] ?? 'light';
-            error_log('Session variables set for user ID: ' . $user['id']);
+
+            error_log('[AuthController] Sessão configurada para o usuário: ' . $user['email']);
 
             // Se marcou "lembrar-me", gera um token
             if ($remember) {
                 $token = bin2hex(random_bytes(32));
                 User::update($user['id'], ['remember_token' => $token]);
                 setcookie('remember_token', $token, time() + (86400 * 30), '/', '', true, true);
+                error_log('[AuthController] Token de "lembrar-me" gerado');
             }
 
             $this->setFlash('success', 'Login realizado com sucesso!');
             $this->redirect('/dashboard');
 
         } catch (\Exception $e) {
-            error_log('Erro no login: ' . $e->getMessage());
-            $this->setFlash('error', 'Erro ao realizar login. Tente novamente.');
+            error_log('[AuthController] Erro no login: ' . $e->getMessage());
+            $this->setFlash('error', 'Erro ao realizar login. Por favor, tente novamente.');
             $this->redirect('/login');
         }
     }

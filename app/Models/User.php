@@ -36,28 +36,45 @@ class User extends Model {
 
     public static function validateLogin(string $email, string $password): ?array {
         try {
+            error_log("[User] Tentando validar login para email: " . $email);
             $db = self::getDB();
             
-            // Busca o usuário e verifica se está ativo
-            $sql = "SELECT * FROM " . static::$table . " WHERE email = :email AND active = 1";
+            // Busca o usuário independente do status
+            $sql = "SELECT * FROM " . static::$table . " WHERE email = :email";
             $stmt = $db->prepare($sql);
             $stmt->execute(['email' => $email]);
             $user = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$user) {
+                error_log("[User] Usuário não encontrado para o email: " . $email);
+                return null;
+            }
+
+            error_log("[User] Usuário encontrado, verificando status e senha");
+
+            // Verifica se o usuário está ativo
+            if (!$user['active']) {
+                error_log("[User] Usuário inativo: " . $email);
                 return null;
             }
 
             // Verifica se a conta está bloqueada
             if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
+                error_log("[User] Conta bloqueada até: " . $user['locked_until']);
                 return null;
             }
 
+            // Debug do hash da senha
+            error_log("[User] Hash da senha armazenada: " . $user['password']);
+            
             // Verifica a senha
             if (!password_verify($password, $user['password'])) {
+                error_log("[User] Senha inválida para o usuário: " . $email);
                 self::incrementFailedAttempts($user['id']);
                 return null;
             }
+
+            error_log("[User] Senha válida, autenticação bem-sucedida");
 
             // Verifica se a senha precisa ser atualizada
             if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
