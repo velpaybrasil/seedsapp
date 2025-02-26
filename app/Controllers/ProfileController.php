@@ -5,53 +5,78 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\View;
 use App\Models\User;
+use App\Models\Role;
 
 class ProfileController extends Controller {
-    private $userModel;
+    private User $userModel;
+    private Role $roleModel;
     
     public function __construct() {
         parent::__construct();
         $this->userModel = new User();
+        $this->roleModel = new Role();
     }
     
     public function showProfile() {
         try {
-            $user = auth();
+            // Verificar se o usuário está logado
+            if (!$this->isLoggedIn()) {
+                $this->setFlash('error', 'Você precisa estar logado para acessar esta página.');
+                $this->redirect('/login');
+                return;
+            }
+
+            // Pegar ID do usuário da sessão
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                $this->setFlash('error', 'Sessão inválida.');
+                $this->redirect('/login');
+                return;
+            }
             
-            if (!$user) {
+            // Buscar dados completos do usuário
+            $userDetails = $this->userModel->getUserWithRoles($userId);
+            if (!$userDetails) {
                 $this->setFlash('error', 'Usuário não encontrado.');
                 $this->redirect('/dashboard');
                 return;
             }
             
-            // Get user details from database to ensure we have fresh data
-            $userDetails = $this->userModel->find($user['id']);
-            
-            // Prepare profile data
+            // Preparar dados do perfil
             $profile = [
                 'id' => $userDetails['id'],
                 'name' => $userDetails['name'],
                 'email' => $userDetails['email'],
                 'avatar' => $userDetails['avatar'] ?? null,
-                'role' => $userDetails['role'] ?? 'Membro',
+                'phone' => $userDetails['phone'] ?? null,
+                'birth_date' => $userDetails['birth_date'] ?? null,
+                'address' => $userDetails['address'] ?? null,
+                'city' => $userDetails['city'] ?? null,
+                'state' => $userDetails['state'] ?? null,
+                'zip_code' => $userDetails['zip_code'] ?? null,
+                'bio' => $userDetails['bio'] ?? null,
+                'facebook' => $userDetails['facebook'] ?? null,
+                'instagram' => $userDetails['instagram'] ?? null,
+                'twitter' => $userDetails['twitter'] ?? null,
+                'linkedin' => $userDetails['linkedin'] ?? null,
+                'role' => !empty($userDetails['roles']) ? $userDetails['roles'][0]['name'] : 'Membro',
                 'joined_date' => $userDetails['created_at']
             ];
             
-            // Prepare stats data
+            // Preparar estatísticas
             $stats = [
-                'total_messages' => 0, // TODO: Implement message counting
-                'total_notifications' => 0, // TODO: Implement notification counting
-                'total_schedules' => 0, // TODO: Implement schedule counting
-                'total_transactions' => 0 // TODO: Implement transaction counting
+                'total_messages' => $this->countUserMessages($userId),
+                'total_notifications' => $this->countUserNotifications($userId),
+                'total_schedules' => $this->countUserSchedules($userId),
+                'total_transactions' => $this->countUserTransactions($userId)
             ];
             
-            // Prepare recent activity data (placeholder)
+            // Preparar atividades recentes
             $recentActivity = [
                 [
-                    'type' => 'message',
+                    'date' => date('d/m H:i'),
                     'title' => 'Bem-vindo ao Sistema',
                     'description' => 'Esta é sua primeira atividade no sistema.',
-                    'created_at' => date('Y-m-d H:i:s'),
                     'icon' => 'fas fa-envelope'
                 ]
             ];
@@ -62,45 +87,123 @@ class ProfileController extends Controller {
                 'recentActivity' => $recentActivity,
                 'title' => 'Meu Perfil'
             ]);
+
         } catch (\Exception $e) {
-            error_log('Erro ao carregar perfil: ' . $e->getMessage());
+            error_log("[ProfileController] Erro ao carregar perfil: " . $e->getMessage());
             $this->setFlash('error', 'Erro ao carregar perfil.');
             $this->redirect('/dashboard');
         }
     }
     
+    private function countUserMessages(int $userId): int {
+        // TODO: Implementar contagem de mensagens
+        return 0;
+    }
+    
+    private function countUserNotifications(int $userId): int {
+        // TODO: Implementar contagem de notificações
+        return 0;
+    }
+    
+    private function countUserSchedules(int $userId): int {
+        // TODO: Implementar contagem de escalas
+        return 0;
+    }
+    
+    private function countUserTransactions(int $userId): int {
+        // TODO: Implementar contagem de transações
+        return 0;
+    }
+    
     public function updateProfile() {
         try {
-            $user = auth();
-            if (!$user) {
-                throw new \Exception('Usuário não encontrado.');
+            // Verificar se o usuário está logado
+            if (!$this->isLoggedIn()) {
+                throw new \Exception('Você precisa estar logado para atualizar seu perfil.');
+            }
+
+            // Pegar ID do usuário da sessão
+            $userId = $_SESSION['user_id'] ?? null;
+            if (!$userId) {
+                throw new \Exception('Sessão inválida.');
             }
             
+            // Validar campos obrigatórios
+            if (empty($_POST['name'])) {
+                throw new \Exception('O nome é obrigatório.');
+            }
+            
+            // Preparar dados para atualização
             $data = [
-                'name' => $_POST['name'] ?? '',
-                'email' => $_POST['email'] ?? '',
-                'phone' => $_POST['phone'] ?? null
+                'name' => $_POST['name'],
+                'phone' => $_POST['phone'] ?? null,
+                'birth_date' => $_POST['birth_date'] ?? null,
+                'address' => $_POST['address'] ?? null,
+                'city' => $_POST['city'] ?? null,
+                'state' => $_POST['state'] ?? null,
+                'zip_code' => $_POST['zip_code'] ?? null,
+                'bio' => $_POST['bio'] ?? null,
+                'facebook' => $_POST['facebook'] ?? null,
+                'instagram' => $_POST['instagram'] ?? null,
+                'twitter' => $_POST['twitter'] ?? null,
+                'linkedin' => $_POST['linkedin'] ?? null,
+                'updated_at' => date('Y-m-d H:i:s')
             ];
             
-            // Validar campos obrigatórios
-            if (empty($data['name']) || empty($data['email'])) {
-                throw new \Exception('Nome e e-mail são obrigatórios.');
+            // Atualizar avatar se fornecido
+            if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+                $avatar = $this->handleAvatarUpload($_FILES['avatar']);
+                if ($avatar) {
+                    $data['avatar'] = $avatar;
+                }
             }
             
             // Atualizar usuário
-            $success = $this->userModel->update($user['id'], $data);
-            
-            if ($success) {
-                $this->setFlash('success', 'Perfil atualizado com sucesso.');
-            } else {
-                $this->setFlash('error', 'Erro ao atualizar perfil.');
+            if (!$this->userModel->update($userId, $data)) {
+                throw new \Exception('Erro ao atualizar perfil.');
             }
             
+            $this->setFlash('success', 'Perfil atualizado com sucesso.');
+            
         } catch (\Exception $e) {
+            error_log("[ProfileController] Erro ao atualizar perfil: " . $e->getMessage());
             $this->setFlash('error', $e->getMessage());
         }
         
         $this->redirect('/profile');
+    }
+    
+    private function handleAvatarUpload(array $file): ?string {
+        try {
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            $maxSize = 5 * 1024 * 1024; // 5MB
+            
+            if (!in_array($file['type'], $allowedTypes)) {
+                throw new \Exception('Tipo de arquivo não permitido.');
+            }
+            
+            if ($file['size'] > $maxSize) {
+                throw new \Exception('Arquivo muito grande. Máximo permitido: 5MB');
+            }
+            
+            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filename = uniqid('avatar_') . '.' . $extension;
+            $uploadPath = __DIR__ . '/../../public/uploads/avatars/';
+            
+            if (!is_dir($uploadPath)) {
+                mkdir($uploadPath, 0777, true);
+            }
+            
+            if (!move_uploaded_file($file['tmp_name'], $uploadPath . $filename)) {
+                throw new \Exception('Erro ao fazer upload do arquivo.');
+            }
+            
+            return '/uploads/avatars/' . $filename;
+            
+        } catch (\Exception $e) {
+            error_log("[ProfileController] Erro ao fazer upload do avatar: " . $e->getMessage());
+            return null;
+        }
     }
     
     public function showSettings() {
