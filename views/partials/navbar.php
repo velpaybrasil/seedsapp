@@ -51,10 +51,22 @@ if (isset($_SESSION['user_id'])): ?>
                         <i class="fas fa-pray"></i> Pedidos de Oração
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link <?= is_active('/users') ?>" href="<?= View::url('/users') ?>">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle <?= is_active('/users') ?>" href="#" role="button" data-bs-toggle="dropdown">
                         <i class="fas fa-users-cog"></i> Usuários
                     </a>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <a class="dropdown-item" href="<?= View::url('/users') ?>">
+                                <i class="fas fa-users me-2"></i>Listar Usuários
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="<?= View::url('/users/roles') ?>">
+                                <i class="fas fa-user-tag me-2"></i>Papéis
+                            </a>
+                        </li>
+                    </ul>
                 </li>
             </ul>
 

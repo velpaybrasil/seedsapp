@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Tempo de geração: 21/02/2025 às 12:09
+-- Tempo de geração: 26/02/2025 às 17:17
 -- Versão do servidor: 10.11.10-MariaDB
 -- Versão do PHP: 7.2.34
 
@@ -738,8 +738,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `email`, `password`, `role`, `is_owner`, `created_at`, `updated_at`, `active`, `last_login`, `must_change_password`, `failed_login_attempts`, `locked_until`, `remember_token`, `remember_token_expires_at`, `theme`, `notifications_enabled`, `email_notifications`) VALUES
-(97, 'Paulo Gustavo', 'pgustavodlima@gmail.com', '$2y$10$Hh5lwuP4iN9V8h2qzEb0OOu1z1Vx8/YwvHYHLvjTHN9KL4jk4IXLC', 'admin', 1, '2025-01-24 18:44:35', '2025-02-06 01:15:22', 1, NULL, 0, 0, NULL, NULL, NULL, 'light', 1, 1),
-(100, 'Paulo Gustavo', 'admin@paulogustavo.me', '$2y$10$QjmAMtMcctzNxBDCn9uaMeJCrRUNlPs2NdVzrOFwFq/1xjE2EoelG', 'admin', 1, '2025-01-25 03:14:39', '2025-02-21 11:27:40', 1, '2025-02-21 11:27:40', 0, 0, NULL, NULL, '2025-03-07 22:15:54', 'light', 1, 1);
+(97, 'Paulo Gustavo', 'pgustavodlima@gmail.com', '$2y$10$Hh5lwuP4iN9V8h2qzEb0OOu1z1Vx8/YwvHYHLvjTHN9KL4jk4IXLC', 'admin', 1, '2025-01-24 18:44:35', '2025-02-21 13:42:46', 1, NULL, 0, 3, NULL, NULL, NULL, 'light', 1, 1),
+(100, 'Paulo Gustavo', 'admin@paulogustavo.me', '$2y$10$QjmAMtMcctzNxBDCn9uaMeJCrRUNlPs2NdVzrOFwFq/1xjE2EoelG', 'admin', 1, '2025-01-25 03:14:39', '2025-02-26 15:52:26', 1, '2025-02-26 15:52:26', 0, 0, NULL, NULL, '2025-03-07 22:15:54', 'light', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -826,7 +826,8 @@ CREATE TABLE `visitors` (
 
 INSERT INTO `visitors` (`id`, `name`, `birth_date`, `marital_status`, `phone`, `whatsapp`, `address`, `number`, `complement`, `email`, `neighborhood`, `zipcode`, `gender`, `first_visit_date`, `how_knew_church`, `prayer_requests`, `observations`, `follow_up_date`, `follow_up_notes`, `follow_up_status`, `photo`, `status`, `wants_group`, `available_days`, `consent_date`, `created_at`, `updated_at`, `group_id`, `city`, `state`, `zip_code`, `has_children`, `number_of_children`, `profession`, `church_member`, `previous_church`, `conversion_date`, `baptism_date`, `source`, `assigned_to`) VALUES
 (3, 'Cintia Mendonça ', NULL, 'married', '85999567338', NULL, NULL, NULL, NULL, 'cintiambslima@gmail.com', 'Cajazeiras ', NULL, 'F', NULL, NULL, '', NULL, NULL, NULL, 'pending', NULL, '', 'yes', NULL, NULL, '2025-02-20 18:58:36', '2025-02-20 18:58:36', NULL, 'Fortaleza', NULL, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL),
-(4, 'PAULO GUSTAVO', '1986-04-08', 'married', '(85) 99763-7850', NULL, NULL, NULL, NULL, 'pgustavodlima@gmail.com', 'Cajazeiras', NULL, 'M', NULL, NULL, 'teste', NULL, NULL, NULL, 'pending', NULL, '', 'yes', NULL, NULL, '2025-02-21 11:46:40', '2025-02-21 11:46:40', NULL, 'Fortaleza', NULL, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL);
+(4, 'PAULO GUSTAVO', '1986-04-08', 'married', '(85) 99763-7850', NULL, NULL, NULL, NULL, 'pgustavodlima@gmail.com', 'Cajazeiras', NULL, 'M', NULL, NULL, 'teste', NULL, NULL, NULL, 'pending', NULL, '', 'yes', NULL, NULL, '2025-02-21 11:46:40', '2025-02-21 11:46:40', NULL, 'Fortaleza', NULL, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL),
+(5, 'PAULO GUSTAVO', '1986-04-08', 'married', '85997637850', '', 'Rua Jatobá', NULL, NULL, 'gustavolimap@gmail.com', 'Cajazeiras', '60864595', 'M', '2025-01-01', 'Google', 'teste', NULL, NULL, NULL, 'pending', NULL, 'contacted', 'yes', NULL, NULL, '2025-02-21 13:23:58', '2025-02-26 13:29:31', NULL, 'Fortaleza', NULL, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1566,7 +1567,7 @@ ALTER TABLE `user_permissions`
 -- AUTO_INCREMENT de tabela `visitors`
 --
 ALTER TABLE `visitors`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT de tabela `visitor_attendance`

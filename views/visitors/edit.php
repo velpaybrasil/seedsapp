@@ -21,7 +21,7 @@ $styles = '<link href="/assets/css/visitors.css" rel="stylesheet">';
     <!-- Form Card -->
     <div class="card shadow-sm">
         <div class="card-body">
-            <form method="POST" action="/visitors/<?= $visitor['id'] ?>/update" class="needs-validation" enctype="multipart/form-data" novalidate>
+            <form method="POST" action="/visitors/<?= $visitor['id'] ?>" class="needs-validation" enctype="multipart/form-data" novalidate>
                 <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                 <?php 
                 // Define $data para o formulário usar os valores atuais do visitante

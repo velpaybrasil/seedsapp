@@ -1,6 +1,48 @@
 <?php
 $title = 'Detalhes do Visitante';
 
+$styles = '
+<style>
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+.timeline-item {
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 20px;
+}
+.timeline-marker {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #007bff;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #007bff;
+}
+.timeline-item:before {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 15px;
+    height: 100%;
+    width: 2px;
+    background: #007bff;
+}
+.timeline-item:last-child:before {
+    display: none;
+}
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+}
+</style>
+';
+
 // Validar se o visitante existe e tem os dados necessários
 if (!isset($visitor) || !is_array($visitor) || empty($visitor['id'])) {
     error_log("[View/show] Dados do visitante inválidos ou ausentes: " . print_r($visitor ?? null, true));
@@ -415,3 +457,5 @@ error_log("[View/show] Iniciando renderização da view para visitante ID: " . $
         }
     }
 </script>
+
+<?= $styles ?>

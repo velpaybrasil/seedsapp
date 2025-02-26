@@ -17,6 +17,11 @@ abstract class Controller
             session_start();
         }
         
+        // Initialize CSRF token if not set
+        if (!isset($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        
         // Set view path relative to the application root
         $this->viewPath = dirname(dirname(__DIR__)) . '/views';
         
@@ -26,6 +31,26 @@ abstract class Controller
         // Initialize flash messages
         $this->flash = $_SESSION['flash'] ?? [];
         unset($_SESSION['flash']);
+
+        // Verify CSRF token for POST requests
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $token = $_POST['_token'] ?? '';
+            if (!hash_equals($_SESSION['csrf_token'], $token)) {
+                error_log('CSRF token validation failed');
+                $this->setFlash('error', 'Token de segurança inválido. Por favor, tente novamente.');
+                $this->redirect($_SERVER['HTTP_REFERER'] ?? '/');
+                exit;
+            }
+        }
+    }
+
+    protected function validateCsrfToken(): bool
+    {
+        $token = $_POST['_token'] ?? '';
+        if (!hash_equals($_SESSION['csrf_token'], $token)) {
+            return false;
+        }
+        return true;
     }
 
     protected function redirect(string $path): void 
@@ -174,8 +199,11 @@ abstract class Controller
         return $messages;
     }
 
-    protected function getPostData(): array {
-        return $_POST;
+    protected function getPostData(): array
+    {
+        $data = $_POST;
+        unset($data['_token']); // Remove CSRF token from data
+        return $data;
     }
 
     protected function getQueryParams(): array {
@@ -200,7 +228,7 @@ abstract class Controller
 
     protected function validateCSRF(): bool
     {
-        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+        $token = $_POST['_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
         
         if (!$token || !isset($_SESSION['csrf_token'])) {
             return false;

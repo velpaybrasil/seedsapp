@@ -40,10 +40,10 @@ class Database {
                 // Build DSN
                 $dsn = sprintf(
                     '%s:host=%s;dbname=%s;charset=%s',
-                    $dbConfig['driver'],
+                    $dbConfig['driver'] ?? 'mysql',
                     $dbConfig['host'],
                     $dbConfig['database'],
-                    $dbConfig['charset']
+                    $dbConfig['charset'] ?? 'utf8mb4'
                 );
 
                 error_log("[Database] Connecting to database: {$dsn}");
@@ -61,11 +61,9 @@ class Database {
                     ]
                 );
 
-                error_log("[Database] Connection established successfully");
-
+                error_log("[Database] Database connection established successfully");
             } catch (PDOException $e) {
-                error_log("[Database] Failed to connect to database: " . $e->getMessage());
-                error_log("[Database] Stack trace: " . $e->getTraceAsString());
+                error_log("[Database] Connection error: " . $e->getMessage());
                 throw $e;
             }
         }
@@ -73,15 +71,51 @@ class Database {
         return self::$connection;
     }
 
+    public static function beginTransaction(): bool {
+        try {
+            return self::getConnection()->beginTransaction();
+        } catch (PDOException $e) {
+            error_log("[Database] Error starting transaction: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function commit(): bool {
+        try {
+            return self::getConnection()->commit();
+        } catch (PDOException $e) {
+            error_log("[Database] Error committing transaction: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function rollBack(): bool {
+        try {
+            return self::getConnection()->rollBack();
+        } catch (PDOException $e) {
+            error_log("[Database] Error rolling back transaction: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function execute(string $sql, array $params = []): bool {
+        try {
+            $stmt = self::getConnection()->prepare($sql);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("[Database] Error executing query: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
     public static function fetch(string $sql, array $params = []): ?array {
         try {
             $stmt = self::getConnection()->prepare($sql);
             $stmt->execute($params);
-            $result = $stmt->fetch();
-            return $result ?: null;
+            return $stmt->fetch() ?: null;
         } catch (PDOException $e) {
-            error_log('Database fetch error: ' . $e->getMessage());
-            throw new PDOException('Database fetch failed: ' . $e->getMessage());
+            error_log("[Database] Error fetching row: " . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -91,49 +125,12 @@ class Database {
             $stmt->execute($params);
             return $stmt->fetchAll();
         } catch (PDOException $e) {
-            error_log('Database fetchAll error: ' . $e->getMessage());
-            throw new PDOException('Database fetchAll failed: ' . $e->getMessage());
-        }
-    }
-
-    public static function execute(string $sql, array $params = []): bool {
-        try {
-            $stmt = self::getConnection()->prepare($sql);
-            return $stmt->execute($params);
-        } catch (PDOException $e) {
-            error_log('Database execute error: ' . $e->getMessage());
-            throw new PDOException('Database execute failed: ' . $e->getMessage());
-        }
-    }
-
-    public static function count(string $sql, array $params = []): int {
-        try {
-            $stmt = self::getConnection()->prepare($sql);
-            $stmt->execute($params);
-            return (int) $stmt->fetchColumn();
-        } catch (PDOException $e) {
-            error_log('Database count error: ' . $e->getMessage());
-            throw new PDOException('Database count failed: ' . $e->getMessage());
+            error_log("[Database] Error fetching all rows: " . $e->getMessage());
+            throw $e;
         }
     }
 
     public static function lastInsertId(): string {
         return self::getConnection()->lastInsertId();
-    }
-
-    public static function beginTransaction(): bool {
-        return self::getConnection()->beginTransaction();
-    }
-
-    public static function commit(): bool {
-        return self::getConnection()->commit();
-    }
-
-    public static function rollBack(): bool {
-        return self::getConnection()->rollBack();
-    }
-
-    public static function quote(string $string): string {
-        return self::getConnection()->quote($string);
     }
 }

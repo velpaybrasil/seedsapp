@@ -64,53 +64,6 @@ class GroupController extends Controller {
             $leaders = $this->userModel->getLeaders();
             error_log("[GroupController] Líderes encontrados: " . count($leaders));
             
-            if ($this->isPost()) {
-                $data = $this->getPostData();
-                error_log("[GroupController] Dados recebidos: " . json_encode($data));
-                
-                $errors = $this->validateInput(
-                    $data,
-                    [
-                        'name' => 'required|min:3',
-                        'description' => 'required',
-                        'meeting_day' => 'required',
-                        'meeting_time' => 'required',
-                        'meeting_address' => 'required',
-                        'neighborhood' => 'required',
-                        'max_participants' => 'required|numeric',
-                        'ministry_id' => 'required|numeric',
-                        'leaders' => 'required|array|min:1',
-                        'latitude' => 'numeric|between:-90,90',
-                        'longitude' => 'numeric|between:-180,180'
-                    ]
-                );
-
-                if (!empty($errors)) {
-                    error_log("[GroupController] Erros de validação: " . json_encode($errors));
-                    $this->setFlash('error', 'Por favor, corrija os erros no formulário.');
-                    $_SESSION['form_errors'] = $errors;
-                    $this->redirect('/groups/create');
-                    return;
-                }
-
-                try {
-                    $groupId = $this->groupModel->create($data);
-                    if ($groupId) {
-                        error_log("[GroupController] Grupo criado com sucesso. ID: " . $groupId);
-                        $this->setFlash('success', 'Grupo criado com sucesso!');
-                        $this->redirect('/groups');
-                    } else {
-                        throw new \Exception('Erro ao criar o grupo.');
-                    }
-                } catch (\Exception $e) {
-                    error_log("[GroupController] Erro ao criar grupo: " . $e->getMessage());
-                    error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
-                    $this->setFlash('error', 'Erro ao criar o grupo.');
-                    $this->redirect('/groups/create');
-                }
-                return;
-            }
-            
             error_log("[GroupController] Carregando formulário de criação");
             error_log("[GroupController] Total de líderes disponíveis: " . count($leaders));
             error_log("[GroupController] Total de ministérios disponíveis: " . count($ministries));
@@ -127,6 +80,103 @@ class GroupController extends Controller {
             error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
             $this->setFlash('error', 'Erro ao carregar o formulário.');
             $this->redirect('/groups');
+        }
+    }
+
+    public function store(): void
+    {
+        try {
+            if (!$this->isPost()) {
+                $this->setFlash('error', 'Método não permitido');
+                $this->redirect('/groups');
+                return;
+            }
+
+            $data = $this->getPostData();
+            error_log("[GroupController] Dados recebidos no store: " . json_encode($data));
+
+            // Prepare leaders data in the correct format
+            if (isset($data['leaders']) && is_array($data['leaders'])) {
+                $formattedLeaders = [];
+                foreach ($data['leaders'] as $leaderId) {
+                    $formattedLeaders[] = [
+                        'user_id' => $leaderId,
+                        'role' => 'leader'
+                    ];
+                }
+                $data['leaders'] = $formattedLeaders;
+            }
+
+            // Map Portuguese day names to English
+            $dayMap = [
+                'Segunda-feira' => 'monday',
+                'Terça-feira' => 'tuesday',
+                'Quarta-feira' => 'wednesday',
+                'Quinta-feira' => 'thursday',
+                'Sexta-feira' => 'friday',
+                'Sábado' => 'saturday',
+                'Domingo' => 'sunday'
+            ];
+
+            // Convert meeting day to English
+            if (isset($data['meeting_day'])) {
+                $data['meeting_day'] = strtolower($dayMap[$data['meeting_day']] ?? $data['meeting_day']);
+            }
+
+            // Format meeting time
+            if (isset($data['meeting_time'])) {
+                $data['meeting_time'] = date('H:i', strtotime($data['meeting_time']));
+            }
+
+            $errors = $this->validateInput(
+                $data,
+                [
+                    'name' => 'required|min:3',
+                    'description' => 'required',
+                    'meeting_day' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+                    'meeting_time' => 'required',
+                    'meeting_address' => 'required',
+                    'neighborhood' => 'required',
+                    'max_participants' => 'required|numeric',
+                ]
+            );
+
+            if (!empty($errors)) {
+                error_log("[GroupController] Validation errors: " . json_encode($errors));
+                $_SESSION['old'] = $data;
+                $_SESSION['errors'] = $errors;
+                $this->redirect('/groups/create');
+                return;
+            }
+
+            $groupId = $this->groupModel->create($data);
+
+            if (!$groupId) {
+                error_log("[GroupController] Failed to create group");
+                $this->setFlash('error', 'Erro ao criar o grupo.');
+                $this->redirect('/groups/create');
+                return;
+            }
+
+            // Add leaders to the group
+            if (!empty($data['leaders'])) {
+                foreach ($data['leaders'] as $leader) {
+                    $this->groupLeaderModel->create([
+                        'group_id' => $groupId,
+                        'user_id' => $leader['user_id'],
+                        'role' => $leader['role']
+                    ]);
+                }
+            }
+
+            $this->setFlash('success', 'Grupo criado com sucesso!');
+            $this->redirect('/groups/' . $groupId);
+
+        } catch (\Exception $e) {
+            error_log("[GroupController] Error in store method: " . $e->getMessage());
+            error_log("[GroupController] Stack trace: " . $e->getTraceAsString());
+            $this->setFlash('error', 'Erro ao criar o grupo. Por favor, tente novamente.');
+            $this->redirect('/groups/create');
         }
     }
 

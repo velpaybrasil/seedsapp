@@ -2,7 +2,7 @@
 
 use App\Core\View;
 
-View::extends('app');
+View::extends('layouts/app');
 
 View::section('styles'); ?>
 <style>

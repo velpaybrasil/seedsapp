@@ -41,7 +41,7 @@ class Visitor extends Model {
     ];
 
     protected static array $validationRules = [
-        'name' => 'min:3|max:255',
+        'name' => 'max:255',
         'email' => 'email|unique:visitors,email,id',
         'phone' => 'unique:visitors,phone,id|regex:/^[1-9]{2}[0-9]{8,9}$/',
         'whatsapp' => 'regex:/^[1-9]{2}[0-9]{8,9}$/',
@@ -64,7 +64,8 @@ class Visitor extends Model {
         $db = Database::getInstance()->getConnection();
         
         foreach (static::$validationRules as $field => $rules) {
-            if (!isset($data[$field]) && strpos($rules, 'required') === false) {
+            // Pular validação se o campo estiver vazio
+            if (empty($data[$field])) {
                 continue;
             }
             
@@ -78,70 +79,67 @@ class Visitor extends Model {
                 }
                 
                 switch ($ruleName) {
-                    case 'required':
-                        if (empty($data[$field])) {
-                            $errors[$field][] = "O campo {$field} é obrigatório.";
-                        }
-                        break;
-                        
                     case 'email':
-                        if (!empty($data[$field]) && !filter_var($data[$field], FILTER_VALIDATE_EMAIL)) {
+                        if (!filter_var($data[$field], FILTER_VALIDATE_EMAIL)) {
                             $errors[$field][] = "Email inválido.";
                         }
                         break;
                         
                     case 'min':
-                        if (!empty($data[$field]) && strlen($data[$field]) < (int)$ruleValue) {
+                        if (strlen($data[$field]) < (int)$ruleValue) {
                             $errors[$field][] = "O campo deve ter no mínimo {$ruleValue} caracteres.";
                         }
                         break;
                         
                     case 'max':
-                        if (!empty($data[$field]) && strlen($data[$field]) > (int)$ruleValue) {
+                        if (strlen($data[$field]) > (int)$ruleValue) {
                             $errors[$field][] = "O campo deve ter no máximo {$ruleValue} caracteres.";
                         }
                         break;
                         
                     case 'date':
-                        if (!empty($data[$field])) {
-                            $date = date_parse($data[$field]);
-                            if ($date['error_count'] > 0) {
-                                $errors[$field][] = "Data inválida.";
-                            }
+                        $date = date_parse($data[$field]);
+                        if ($date['error_count'] > 0) {
+                            $errors[$field][] = "Data inválida.";
                         }
                         break;
                         
                     case 'in':
-                        if (!empty($data[$field])) {
-                            $allowedValues = explode(',', $ruleValue);
-                            if (!in_array($data[$field], $allowedValues)) {
-                                $errors[$field][] = "Valor inválido.";
-                            }
+                        $allowedValues = explode(',', $ruleValue);
+                        if (!in_array($data[$field], $allowedValues)) {
+                            $errors[$field][] = "Valor inválido.";
                         }
                         break;
                         
                     case 'unique':
-                        if (!empty($data[$field])) {
-                            [$table, $column, $except] = explode(',', $ruleValue);
-                            $query = "SELECT COUNT(*) FROM {$table} WHERE {$column} = ?";
-                            $params = [$data[$field]];
+                        [$table, $column, $exceptField] = explode(',', $ruleValue);
+                        $query = "SELECT COUNT(*) FROM {$table} WHERE {$column} = ?";
+                        $params = [$data[$field]];
+                        
+                        if (isset($data[$exceptField])) {
+                            $query .= " AND id != ?";
+                            $params[] = $data[$exceptField];
+                        } elseif (isset($data['id'])) {
+                            $query .= " AND id != ?";
+                            $params[] = $data['id'];
+                        }
+                        
+                        try {
+                            $stmt = $db->prepare($query);
+                            $stmt->execute($params);
                             
-                            if (isset($data[$except])) {
-                                $query .= " AND id != ?";
-                                $params[] = $data[$except];
+                            if ($stmt->fetchColumn() > 0) {
+                                $errors[$field][] = "Este {$field} já está em uso.";
                             }
-                            
-                            try {
-                                $stmt = $db->prepare($query);
-                                $stmt->execute($params);
-                                
-                                if ($stmt->fetchColumn() > 0) {
-                                    $errors[$field][] = "Este {$field} já está em uso.";
-                                }
-                            } catch (PDOException $e) {
-                                error_log("Error in unique validation: " . $e->getMessage());
-                                $errors[$field][] = "Erro ao validar unicidade do campo {$field}.";
-                            }
+                        } catch (PDOException $e) {
+                            error_log("Error in unique validation: " . $e->getMessage());
+                            $errors[$field][] = "Erro ao validar unicidade do campo {$field}.";
+                        }
+                        break;
+                        
+                    case 'regex':
+                        if (!preg_match($ruleValue, $data[$field])) {
+                            $errors[$field][] = "Formato inválido.";
                         }
                         break;
                 }
@@ -165,7 +163,30 @@ class Visitor extends Model {
 
     public static function update($id, $data)
     {
+        // Garantir que o ID está nos dados para validação
         $data['id'] = $id;
+        
+        // Tratar o group_id
+        if (isset($data['group_id'])) {
+            if (empty($data['group_id'])) {
+                $data['group_id'] = null;
+            } else {
+                $data['group_id'] = (int)$data['group_id'];
+                // Verificar se o grupo existe
+                try {
+                    $db = static::getDB();
+                    $stmt = $db->prepare("SELECT id FROM growth_groups WHERE id = ?");
+                    $stmt->execute([$data['group_id']]);
+                    if (!$stmt->fetch()) {
+                        $data['group_id'] = null;
+                    }
+                } catch (PDOException $e) {
+                    error_log("Error validating group_id: " . $e->getMessage());
+                    $data['group_id'] = null;
+                }
+            }
+        }
+        
         $errors = static::validate($data);
         
         if (!empty($errors)) {

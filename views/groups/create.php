@@ -2,6 +2,7 @@
 use App\Core\View;
 
 $title = 'Criar Grupo';
+View::extends('layouts/app');
 ?>
 
 <?php View::section('content') ?>
@@ -21,8 +22,8 @@ $title = 'Criar Grupo';
         <div class="col-md-12">
             <div class="card">
                 <div class="card-body">
-                    <form action="<?= View::url('/groups/store') ?>" method="POST" class="needs-validation" novalidate>
-                        <?= csrf_field() ?>
+                    <form action="<?= View::url('/groups') ?>" method="POST" class="needs-validation" novalidate>
+                        <input type="hidden" name="_token" value="<?= View::csrf_token() ?>">
                         
                         <div class="row mb-3">
                             <div class="col-md-6">
@@ -156,5 +157,3 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 <?php View::endSection() ?>
-
-<?php require_once VIEWS_PATH . '/layouts/app.php' ?>

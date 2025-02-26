@@ -362,6 +362,8 @@ class VisitorController extends Controller {
     public function update($id) {
         try {
             error_log("[VisitorController] Starting update for visitor ID: " . $id);
+            error_log("[VisitorController] Request Method: " . $_SERVER['REQUEST_METHOD']);
+            error_log("[VisitorController] Request URI: " . $_SERVER['REQUEST_URI']);
             
             // Validar CSRF
             if (!$this->validateCSRF()) {
@@ -392,7 +394,8 @@ class VisitorController extends Controller {
 
             // Preparar dados
             $data = [
-                'name' => $_POST['name'],
+                'id' => $id, // Adicionar ID explicitamente para validação
+                'name' => $_POST['name'] ?? null,
                 'email' => $_POST['email'] ?? null,
                 'phone' => $_POST['phone'] ?? null,
                 'whatsapp' => $_POST['whatsapp'] ?? null,
@@ -405,7 +408,7 @@ class VisitorController extends Controller {
                 'first_visit_date' => $_POST['first_visit_date'] ?? null,
                 'marital_status' => $_POST['marital_status'] ?? null,
                 'profession' => $_POST['profession'] ?? null,
-                'group_id' => $_POST['group_id'] ?? null,
+                'group_id' => !empty($_POST['group_id']) ? (int)$_POST['group_id'] : null,
                 'wants_group' => $_POST['wants_group'] ?? 'no',
                 'notes' => $_POST['notes'] ?? null,
                 'how_knew_church' => $_POST['how_knew_church'] ?? null,
@@ -417,34 +420,19 @@ class VisitorController extends Controller {
 
             error_log("[VisitorController] Initial data: " . print_r($data, true));
 
-            // Sanitizar dados
+            // Sanitizar dados (mantendo valores vazios)
             $data = array_map(function($value) {
-                return $value !== null ? trim($value) : null;
-            }, $data);
-            
-            $data = array_map(function($value) {
-                return $value !== null ? strip_tags($value) : null;
+                if ($value === null || $value === '') {
+                    return null;
+                }
+                $value = trim($value);
+                return strip_tags($value);
             }, $data);
 
             error_log("[VisitorController] Data after sanitization: " . print_r($data, true));
 
-            // Remover campos vazios, exceto os que podem ser vazios
-            $data = array_filter($data, function($value, $key) {
-                // Campos que podem ser vazios
-                $allowEmpty = [
-                    'email', 'phone', 'whatsapp', 'address', 'neighborhood', 
-                    'city', 'state', 'zipcode', 'birth_date', 'first_visit_date',
-                    'marital_status', 'profession', 'group_id', 'notes',
-                    'how_knew_church', 'prayer_requests', 'observations',
-                    'status', 'updated_at'
-                ];
-                
-                return in_array($key, $allowEmpty) || ($value !== '' && $value !== null);
-            }, ARRAY_FILTER_USE_BOTH);
-
-            error_log("[VisitorController] Data after filtering: " . print_r($data, true));
-
-            // Formatar telefone e CEP
+            // Remover array_filter para manter todos os campos
+            // Apenas formatar telefone e CEP se não forem vazios
             if (!empty($data['phone'])) {
                 $data['phone'] = preg_replace('/[^0-9]/', '', $data['phone']);
             }

@@ -257,7 +257,7 @@ View::section('styles'); ?>
                                 </span>
                             </td>
                             <td>
-                                <?php if ($user['last_login']): ?>
+                                <?php if (!empty($user['last_login'])): ?>
                                     <?= date('d/m/Y H:i', strtotime($user['last_login'])) ?>
                                 <?php else: ?>
                                     <span class="text-muted">Nunca acessou</span>

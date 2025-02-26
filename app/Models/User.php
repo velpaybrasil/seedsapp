@@ -12,12 +12,10 @@ class User extends Model {
         'name',
         'email',
         'password',
-        'phone',
-        'role',
         'active',
-        'theme',
-        'notifications_enabled',
-        'email_notifications',
+        'reset_token',
+        'reset_token_expiry',
+        'last_login',
         'created_at',
         'updated_at'
     ];
@@ -466,74 +464,67 @@ class User extends Model {
      * @param int $perPage Registros por página
      * @return array Lista de usuários e total de registros
      */
-    public static function getUsersWithRoles(?string $search = null, ?string $status = null, int $page = 1, int $perPage = 10): array
-    {
+    public static function getUsersWithRoles(?string $search = null, ?string $status = null, int $page = 1, int $perPage = 10): array {
         try {
-            $conditions = [];
+            $db = self::getDB();
+            $offset = ($page - 1) * $perPage;
+            
+            $where = [];
             $params = [];
             
             if ($search) {
-                $conditions[] = "(u.name LIKE :search OR u.email LIKE :search)";
-                $params[':search'] = "%{$search}%";
+                $where[] = "(u.name LIKE :search OR u.email LIKE :search)";
+                $params['search'] = "%{$search}%";
             }
             
-            if ($status) {
-                $conditions[] = "u.status = :status";
-                $params[':status'] = $status;
+            if ($status !== null) {
+                $where[] = "u.active = :status";
+                $params['status'] = $status === 'active' ? 1 : 0;
             }
             
-            $where = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
+            $whereClause = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
             
-            // Conta total de registros
-            $countSql = "
-                SELECT COUNT(DISTINCT u.id) as total 
-                FROM " . static::$table . " u
-                {$where}
-            ";
+            // Count total records
+            $countSql = "SELECT COUNT(DISTINCT u.id) as total 
+                        FROM " . static::$table . " u 
+                        LEFT JOIN user_roles ur ON u.id = ur.user_id 
+                        LEFT JOIN roles r ON ur.role_id = r.id 
+                        {$whereClause}";
             
-            $stmt = self::getDB()->prepare($countSql);
+            $stmt = $db->prepare($countSql);
+            $stmt->execute($params);
+            $total = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
+            
+            // Get paginated records
+            $sql = "SELECT u.*, GROUP_CONCAT(r.name) as roles 
+                   FROM " . static::$table . " u 
+                   LEFT JOIN user_roles ur ON u.id = ur.user_id 
+                   LEFT JOIN roles r ON ur.role_id = r.id 
+                   {$whereClause} 
+                   GROUP BY u.id 
+                   ORDER BY u.created_at DESC 
+                   LIMIT :limit OFFSET :offset";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':limit', $perPage, \PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+            
             foreach ($params as $key => $value) {
                 $stmt->bindValue($key, $value);
             }
+            
             $stmt->execute();
-            $total = (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-            
-            // Calcula offset
-            $offset = ($page - 1) * $perPage;
-            
-            // Busca usuários
-            $sql = "
-                SELECT u.*, GROUP_CONCAT(r.name) as roles
-                FROM " . static::$table . " u
-                LEFT JOIN user_roles ur ON u.id = ur.user_id
-                LEFT JOIN roles r ON ur.role_id = r.id
-                {$where}
-                GROUP BY u.id
-                ORDER BY u.created_at DESC
-                LIMIT :limit OFFSET :offset
-            ";
-            
-            $stmt = self::getDB()->prepare($sql);
-            foreach ($params as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
-            $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-            $stmt->execute();
-            
-            $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $users = $stmt->fetchAll(\PDO::FETCH_ASSOC);
             
             return [
                 'users' => $users,
-                'total' => $total,
-                'pages' => ceil($total / $perPage)
+                'total' => $total
             ];
         } catch (\PDOException $e) {
-            error_log("[User] Erro ao buscar usuários: " . $e->getMessage());
+            error_log("[User] Erro ao buscar usuários com papéis: " . $e->getMessage());
             return [
                 'users' => [],
-                'total' => 0,
-                'pages' => 0
+                'total' => 0
             ];
         }
     }
@@ -563,6 +554,18 @@ class User extends Model {
         } catch (\PDOException $e) {
             error_log("[User] Erro ao buscar usuário: " . $e->getMessage());
             return null;
+        }
+    }
+
+    public static function removeAllRoles(int $userId): bool {
+        try {
+            $db = self::getDB();
+            $sql = "DELETE FROM user_roles WHERE user_id = :user_id";
+            $stmt = $db->prepare($sql);
+            return $stmt->execute(['user_id' => $userId]);
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao remover papéis do usuário: " . $e->getMessage());
+            return false;
         }
     }
 }

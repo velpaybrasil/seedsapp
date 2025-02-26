@@ -1,7 +1,7 @@
 <?php
 use App\Core\View;
 
-View::extends('app');
+View::extends('layouts/app');
 
 View::section('content'); ?>
 <div class="content-spacing">
@@ -22,27 +22,47 @@ View::section('content'); ?>
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
-                    <form action="<?= View::url('users/roles/store') ?>" method="POST">
-                        <input type="hidden" name="_token" value="<?= $_SESSION['_token'] ?>">
+                    <form action="<?= View::url('users/roles') ?>" method="POST">
+                        <?= View::csrf() ?>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="name" class="form-label">Nome do Papel</label>
                                     <input type="text" 
-                                           class="form-control" 
+                                           class="form-control <?= isset($errors['name']) ? 'is-invalid' : '' ?>" 
                                            id="name" 
                                            name="name" 
+                                           value="<?= old('name') ?>"
                                            required>
+                                    <?php if (isset($errors['name'])): ?>
+                                        <div class="invalid-feedback"><?= $errors['name'] ?></div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="description" class="form-label">Descrição</label>
                                     <input type="text" 
-                                           class="form-control" 
+                                           class="form-control <?= isset($errors['description']) ? 'is-invalid' : '' ?>" 
                                            id="description" 
-                                           name="description">
+                                           name="description"
+                                           value="<?= old('description') ?>">
+                                    <?php if (isset($errors['description'])): ?>
+                                        <div class="invalid-feedback"><?= $errors['description'] ?></div>
+                                    <?php endif; ?>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" 
+                                       class="form-check-input" 
+                                       id="active" 
+                                       name="active" 
+                                       value="1"
+                                       <?= old('active', true) ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="active">Ativo</label>
                             </div>
                         </div>
 
@@ -52,7 +72,7 @@ View::section('content'); ?>
                         <div class="card mb-3">
                             <div class="card-header bg-light">
                                 <h6 class="mb-0">
-                                    <i class="<?= $module['icon'] ?> me-2"></i>
+                                    <i class="<?= htmlspecialchars($module['icon']) ?> me-2"></i>
                                     <?= htmlspecialchars($module['name']) ?>
                                 </h6>
                             </div>
@@ -70,7 +90,8 @@ View::section('content'); ?>
                                                    type="checkbox" 
                                                    name="permissions[]" 
                                                    value="<?= $permission['id'] ?>" 
-                                                   id="perm-<?= $permission['id'] ?>">
+                                                   id="perm-<?= $permission['id'] ?>"
+                                                   <?= in_array($permission['id'], old('permissions', [])) ? 'checked' : '' ?>>
                                             <label class="form-check-label" for="perm-<?= $permission['id'] ?>">
                                                 <?= htmlspecialchars($permission['name']) ?>
                                                 <?php if ($permission['description']): ?>

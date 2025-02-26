@@ -11,6 +11,16 @@ class View {
     
     public static function init(string $viewsPath): void {
         self::$viewsPath = $viewsPath;
+        
+        // Initialize session if not started
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        // Initialize CSRF token if not set
+        if (!isset($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
     }
     
     public static function render(string $view, array $data = [], ?string $layout = 'app'): void {
@@ -153,11 +163,12 @@ class View {
         return $_SESSION['old'][$key] ?? $default;
     }
     
-    public static function csrf(): string {
+    public static function csrf(): string
+    {
         if (!isset($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
-        return '<input type="hidden" name="csrf_token" value="' . self::escape($_SESSION['csrf_token']) . '">';
+        return '<input type="hidden" name="_token" value="' . htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') . '">';
     }
     
     public static function csrf_token(): string {

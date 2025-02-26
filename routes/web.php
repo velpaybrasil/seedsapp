@@ -3,7 +3,7 @@
 use App\Core\Router;
 use App\Controllers\VisitorFormController;
 use App\Controllers\VisitorController;
-use App\Controllers\GrowthGroupController;
+use App\Controllers\GroupController;
 use App\Controllers\DashboardController;
 use App\Controllers\AuthController;
 use App\Controllers\PublicController;
@@ -13,6 +13,7 @@ use App\Controllers\ReportController;
 use App\Controllers\PrayerRequestController;
 use App\Controllers\SystemModuleController;
 use App\Controllers\SystemSettingsController;
+use App\Controllers\UserController;
 
 // Rotas públicas
 Router::get('/', [AuthController::class, 'loginForm']);
@@ -71,19 +72,19 @@ Router::group(['middleware' => ['auth']], function() {
     Router::get('/api/visitors/search', [VisitorController::class, 'apiSearch']);
 
     // Rotas de Grupos
-    Router::get('/groups', [GrowthGroupController::class, 'index']);
-    Router::get('/groups/create', [GrowthGroupController::class, 'create']);
-    Router::post('/groups', [GrowthGroupController::class, 'store']);
-    Router::get('/groups/{id}', [GrowthGroupController::class, 'show']);
-    Router::get('/groups/{id}/edit', [GrowthGroupController::class, 'edit']);
-    Router::put('/groups/{id}', [GrowthGroupController::class, 'update']);
-    Router::delete('/groups/{id}', [GrowthGroupController::class, 'delete']);
+    Router::get('/groups', [GroupController::class, 'index']);
+    Router::get('/groups/create', [GroupController::class, 'create']);
+    Router::post('/groups', [GroupController::class, 'store']);
+    Router::get('/groups/{id}', [GroupController::class, 'show']);
+    Router::get('/groups/{id}/edit', [GroupController::class, 'edit']);
+    Router::put('/groups/{id}', [GroupController::class, 'update']);
+    Router::delete('/groups/{id}', [GroupController::class, 'delete']);
 
     // Rotas para membros dos grupos
-    Router::get('/groups/{id}/members', [GrowthGroupController::class, 'members']);
-    Router::post('/groups/{id}/members/add', [GrowthGroupController::class, 'addMember']);
-    Router::post('/groups/{id}/members/remove', [GrowthGroupController::class, 'removeMember']);
-    Router::post('/groups/{id}/members/status', [GrowthGroupController::class, 'updateMemberStatus']);
+    Router::get('/groups/{id}/members', [GroupController::class, 'members']);
+    Router::post('/groups/{id}/members/add', [GroupController::class, 'addMember']);
+    Router::post('/groups/{id}/members/remove', [GroupController::class, 'removeMember']);
+    Router::post('/groups/{id}/members/status', [GroupController::class, 'updateMemberStatus']);
 
     // Outras rotas protegidas...
     // Rotas de Ministérios
@@ -113,6 +114,14 @@ Router::group(['middleware' => ['auth']], function() {
     Router::get('/system-modules/{id}/edit', [SystemModuleController::class, 'edit']);
     Router::put('/system-modules/{id}', [SystemModuleController::class, 'update']);
     Router::delete('/system-modules/{id}', [SystemModuleController::class, 'delete']);
+
+    // Rotas de Usuários e Permissões
+    Router::get('/users/roles', [UserController::class, 'roles']);
+    Router::get('/users/roles/create', [UserController::class, 'createRole']);
+    Router::post('/users/roles', [UserController::class, 'storeRole']);
+    Router::get('/users/roles/{id}/edit', [UserController::class, 'editRole']);
+    Router::put('/users/roles/{id}', [UserController::class, 'updateRole']);
+    Router::delete('/users/roles/{id}', [UserController::class, 'deleteRole']);
 
     // Configurações do Sistema
     Router::get('/settings/system', [SystemSettingsController::class, 'index']);
