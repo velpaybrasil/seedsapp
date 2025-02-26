@@ -25,41 +25,49 @@ class AuthController extends Controller {
 
     public function login(): void {
         error_log('[AuthController] Iniciando processo de login');
+        
         if (!$this->isPost()) {
             $this->redirect('/login');
             return;
         }
 
-        $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
-        $remember = isset($_POST['remember']);
-
         try {
-            error_log('[AuthController] Validando dados de entrada');
+            // Limpa a sessão anterior
+            session_regenerate_id(true);
+            $_SESSION = array();
             
-            // Valida os dados básicos
+            $email = filter_var(trim($_POST['email'] ?? ''), FILTER_SANITIZE_EMAIL);
+            $password = $_POST['password'] ?? '';
+            $remember = isset($_POST['remember']);
+
+            error_log('[AuthController] Dados recebidos - Email: ' . $email);
+
+            // Validação básica
             if (empty($email) || empty($password)) {
-                error_log('[AuthController] Email ou senha vazios');
                 $this->setFlash('error', 'Por favor, preencha todos os campos.');
                 $this->redirect('/login');
                 return;
             }
 
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                error_log('[AuthController] Email inválido: ' . $email);
                 $this->setFlash('error', 'Por favor, forneça um email válido.');
                 $this->redirect('/login');
                 return;
             }
 
-            error_log('[AuthController] Tentando autenticar usuário');
-            
             // Tenta autenticar o usuário
             $user = User::validateLogin($email, $password);
             error_log('[AuthController] Resultado da autenticação: ' . ($user ? 'Sucesso' : 'Falha'));
 
             if (!$user) {
                 $this->setFlash('error', 'Email ou senha inválidos.');
+                $this->redirect('/login');
+                return;
+            }
+
+            // Verifica se a conta está ativa
+            if (!$user['active']) {
+                $this->setFlash('error', 'Esta conta está inativa. Entre em contato com o administrador.');
                 $this->redirect('/login');
                 return;
             }
@@ -73,7 +81,7 @@ class AuthController extends Controller {
                 return;
             }
 
-            error_log('[AuthController] Usuário autenticado, configurando sessão');
+            error_log('[AuthController] Configurando sessão para o usuário: ' . $user['id']);
 
             // Busca as permissões do usuário
             $permissions = User::getUserPermissions($user['id']);
@@ -82,21 +90,40 @@ class AuthController extends Controller {
             User::updateLastLogin($user['id']);
 
             // Define as variáveis de sessão
-            $_SESSION['logged_in'] = true;
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['user_name'] = $user['name'];
-            $_SESSION['user_email'] = $user['email'];
-            $_SESSION['user_permissions'] = $permissions;
-            $_SESSION['user_theme'] = $user['theme'] ?? 'light';
+            $_SESSION = [
+                'logged_in' => true,
+                'user_id' => $user['id'],
+                'user_name' => $user['name'],
+                'user_email' => $user['email'],
+                'user_permissions' => $permissions,
+                'user_theme' => $user['theme'] ?? 'light',
+                'CREATED' => time(),
+                'LAST_ACTIVITY' => time()
+            ];
 
-            error_log('[AuthController] Sessão configurada para o usuário: ' . $user['email']);
+            error_log('[AuthController] Sessão configurada com sucesso');
 
             // Se marcou "lembrar-me", gera um token
             if ($remember) {
                 $token = bin2hex(random_bytes(32));
-                User::update($user['id'], ['remember_token' => $token]);
-                setcookie('remember_token', $token, time() + (86400 * 30), '/', '', true, true);
-                error_log('[AuthController] Token de "lembrar-me" gerado');
+                $hashedToken = password_hash($token, PASSWORD_DEFAULT);
+                
+                User::update($user['id'], ['remember_token' => $hashedToken]);
+                
+                // Cookie seguro com httponly
+                setcookie(
+                    'remember_token',
+                    $token,
+                    [
+                        'expires' => time() + (86400 * 30),
+                        'path' => '/',
+                        'domain' => '',
+                        'secure' => true,
+                        'httponly' => true,
+                        'samesite' => 'Strict'
+                    ]
+                );
+                error_log('[AuthController] Token de "lembrar-me" configurado');
             }
 
             $this->setFlash('success', 'Login realizado com sucesso!');

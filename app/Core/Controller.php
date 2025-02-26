@@ -173,7 +173,44 @@ abstract class Controller
     }
 
     protected function isLoggedIn(): bool {
-        return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+        if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
+            return false;
+        }
+
+        // Verifica se a sessão é válida
+        if (!$this->session->isValid()) {
+            $this->logout();
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function logout(): void {
+        // Remove o token de "lembrar-me" se existir
+        if (isset($_COOKIE['remember_token'])) {
+            setcookie('remember_token', '', [
+                'expires' => time() - 3600,
+                'path' => '/',
+                'domain' => '',
+                'secure' => true,
+                'httponly' => true,
+                'samesite' => 'Strict'
+            ]);
+        }
+
+        // Limpa e destrói a sessão
+        $this->session->destroy();
+        
+        // Redireciona para a página de login
+        $this->redirect('/login');
+    }
+
+    protected function requireLogin(): void {
+        if (!$this->isLoggedIn()) {
+            $this->setFlash('error', 'Por favor, faça login para continuar.');
+            $this->redirect('/login');
+        }
     }
 
     protected function checkAuth(): void {

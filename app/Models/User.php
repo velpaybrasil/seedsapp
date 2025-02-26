@@ -36,25 +36,40 @@ class User extends Model {
 
     public static function validateLogin(string $email, string $password): ?array {
         try {
-            error_log("[User] Tentando validar login para email: " . $email);
-            $db = self::getDB();
+            error_log("[User] Iniciando validação de login para: " . $email);
             
-            // Busca o usuário independente do status
+            $db = self::getDB();
+            if (!$db) {
+                error_log("[User] Erro: Conexão com banco de dados não disponível");
+                return null;
+            }
+            
+            // Busca o usuário pelo email
             $sql = "SELECT * FROM " . static::$table . " WHERE email = :email";
             $stmt = $db->prepare($sql);
             $stmt->execute(['email' => $email]);
             $user = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if (!$user) {
-                error_log("[User] Usuário não encontrado para o email: " . $email);
+                error_log("[User] Usuário não encontrado: " . $email);
                 return null;
             }
 
-            error_log("[User] Usuário encontrado, verificando status e senha");
+            error_log("[User] Usuário encontrado, verificando senha");
+            error_log("[User] Hash armazenado: " . $user['password']);
+
+            // Verifica a senha
+            if (!password_verify($password, $user['password'])) {
+                error_log("[User] Senha inválida para usuário: " . $email);
+                self::incrementFailedAttempts($user['id']);
+                return null;
+            }
+
+            error_log("[User] Senha válida, verificando status da conta");
 
             // Verifica se o usuário está ativo
             if (!$user['active']) {
-                error_log("[User] Usuário inativo: " . $email);
+                error_log("[User] Conta inativa: " . $email);
                 return null;
             }
 
@@ -64,20 +79,11 @@ class User extends Model {
                 return null;
             }
 
-            // Debug do hash da senha
-            error_log("[User] Hash da senha armazenada: " . $user['password']);
-            
-            // Verifica a senha
-            if (!password_verify($password, $user['password'])) {
-                error_log("[User] Senha inválida para o usuário: " . $email);
-                self::incrementFailedAttempts($user['id']);
-                return null;
-            }
-
-            error_log("[User] Senha válida, autenticação bem-sucedida");
+            error_log("[User] Conta ativa e desbloqueada");
 
             // Verifica se a senha precisa ser atualizada
             if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
+                error_log("[User] Atualizando hash da senha");
                 $newHash = password_hash($password, PASSWORD_DEFAULT);
                 self::update($user['id'], ['password' => $newHash]);
             }
@@ -88,10 +94,29 @@ class User extends Model {
             // Busca os papéis do usuário
             $user['roles'] = self::getUserRoles($user['id']) ?? [];
             
+            error_log("[User] Login validado com sucesso para: " . $email);
             return $user;
+
         } catch (\PDOException $e) {
             error_log("[User] Erro ao validar login: " . $e->getMessage());
             return null;
+        }
+    }
+
+    public static function updateLastLogin(int $id): bool {
+        try {
+            $db = self::getDB();
+            $sql = "UPDATE " . static::$table . " 
+                    SET last_login = NOW(), 
+                        failed_login_attempts = 0, 
+                        locked_until = NULL 
+                    WHERE id = :id";
+            
+            $stmt = $db->prepare($sql);
+            return $stmt->execute(['id' => $id]);
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao atualizar último login: " . $e->getMessage());
+            return false;
         }
     }
 
@@ -144,18 +169,6 @@ class User extends Model {
             $stmt->execute(['id' => $userId]);
         } catch (\PDOException $e) {
             error_log("[User] Erro ao resetar tentativas falhas: " . $e->getMessage());
-        }
-    }
-
-    public static function updateLastLogin(int $id): bool {
-        try {
-            $db = self::getDB();
-            $sql = "UPDATE " . static::$table . " SET last_login = NOW() WHERE id = :id";
-            $stmt = $db->prepare($sql);
-            return $stmt->execute(['id' => $id]);
-        } catch (\PDOException $e) {
-            error_log("[User] Erro ao atualizar último login: " . $e->getMessage());
-            return false;
         }
     }
 
