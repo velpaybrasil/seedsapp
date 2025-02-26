@@ -37,6 +37,8 @@ class User extends Model {
     public static function validateLogin(string $email, string $password): ?array {
         try {
             $db = self::getDB();
+            
+            // Busca o usuário e verifica se está ativo
             $sql = "SELECT * FROM " . static::$table . " WHERE email = :email AND active = 1";
             $stmt = $db->prepare($sql);
             $stmt->execute(['email' => $email]);
@@ -46,13 +48,28 @@ class User extends Model {
                 return null;
             }
 
+            // Verifica se a conta está bloqueada
+            if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
+                return null;
+            }
+
+            // Verifica a senha
             if (!password_verify($password, $user['password'])) {
                 self::incrementFailedAttempts($user['id']);
                 return null;
             }
 
+            // Verifica se a senha precisa ser atualizada
+            if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
+                $newHash = password_hash($password, PASSWORD_DEFAULT);
+                self::update($user['id'], ['password' => $newHash]);
+            }
+
+            // Reseta as tentativas falhas
             self::resetFailedAttempts($user['id']);
-            self::updateLastLogin($user['id']);
+            
+            // Busca os papéis do usuário
+            $user['roles'] = self::getUserRoles($user['id']);
             
             return $user;
         } catch (\PDOException $e) {
@@ -64,16 +81,35 @@ class User extends Model {
     private static function incrementFailedAttempts(int $userId): void {
         try {
             $db = self::getDB();
+            
+            // Busca tentativas atuais
+            $sql = "SELECT failed_login_attempts FROM " . static::$table . " WHERE id = :id";
+            $stmt = $db->prepare($sql);
+            $stmt->execute(['id' => $userId]);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            $attempts = ($result['failed_login_attempts'] ?? 0) + 1;
+            $lockUntil = null;
+
+            // Define o tempo de bloqueio baseado no número de tentativas
+            if ($attempts >= 5) {
+                $lockUntil = date('Y-m-d H:i:s', strtotime('+30 minutes'));
+            } elseif ($attempts >= 3) {
+                $lockUntil = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+            }
+
+            // Atualiza o contador e o bloqueio
             $sql = "UPDATE " . static::$table . " SET 
-                    failed_login_attempts = failed_login_attempts + 1,
-                    locked_until = CASE 
-                        WHEN failed_login_attempts >= 4 THEN DATE_ADD(NOW(), INTERVAL 30 MINUTE)
-                        ELSE NULL 
-                    END
+                    failed_login_attempts = :attempts,
+                    locked_until = :locked_until
                     WHERE id = :id";
             
             $stmt = $db->prepare($sql);
-            $stmt->execute(['id' => $userId]);
+            $stmt->execute([
+                'id' => $userId,
+                'attempts' => $attempts,
+                'locked_until' => $lockUntil
+            ]);
         } catch (\PDOException $e) {
             error_log("[User] Erro ao incrementar tentativas falhas: " . $e->getMessage());
         }
@@ -566,6 +602,111 @@ class User extends Model {
         } catch (\PDOException $e) {
             error_log("[User] Erro ao remover papéis do usuário: " . $e->getMessage());
             return false;
+        }
+    }
+
+    public static function update($id, $data) {
+        try {
+            $db = self::getDB();
+
+            // Se estiver atualizando o email, verifica se já existe
+            if (isset($data['email'])) {
+                $sql = "SELECT id FROM " . static::$table . " WHERE email = :email AND id != :id";
+                $stmt = $db->prepare($sql);
+                $stmt->execute(['email' => $data['email'], 'id' => $id]);
+                if ($stmt->fetch()) {
+                    throw new \Exception("Email já cadastrado");
+                }
+            }
+
+            // Se estiver atualizando a senha, faz o hash
+            if (isset($data['password']) && !empty($data['password'])) {
+                $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            } else {
+                unset($data['password']);
+            }
+
+            // Remove campos não permitidos
+            $allowedFields = array_intersect_key($data, array_flip(self::$fillable));
+            
+            if (empty($allowedFields)) {
+                return true;
+            }
+
+            // Sanitiza os dados
+            foreach ($allowedFields as $field => &$value) {
+                if ($value === '') {
+                    $value = null;
+                } elseif (!is_null($value)) {
+                    $value = trim(strip_tags($value));
+                }
+            }
+
+            // Sempre atualiza o updated_at
+            $allowedFields['updated_at'] = date('Y-m-d H:i:s');
+
+            // Prepara a query
+            $updates = array_map(function($field) {
+                return "{$field} = :{$field}";
+            }, array_keys($allowedFields));
+
+            $sql = "UPDATE " . static::$table . " 
+                    SET " . implode(', ', $updates) . " 
+                    WHERE id = :id";
+
+            $stmt = $db->prepare($sql);
+            return $stmt->execute($allowedFields + ['id' => $id]);
+
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao atualizar usuário: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public static function create($data) {
+        try {
+            // Verifica se o email já existe
+            if (self::findByEmail($data['email'])) {
+                throw new \Exception("Email já cadastrado");
+            }
+
+            // Hash da senha
+            if (isset($data['password'])) {
+                $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            }
+
+            // Garante que campos obrigatórios estejam presentes
+            $data['active'] = $data['active'] ?? 1;
+            $data['created_at'] = $data['created_at'] ?? date('Y-m-d H:i:s');
+            $data['updated_at'] = $data['updated_at'] ?? date('Y-m-d H:i:s');
+
+            // Filtra apenas os campos permitidos
+            $allowedFields = array_intersect_key($data, array_flip(self::$fillable));
+            
+            // Prepara a query
+            $fields = array_keys($allowedFields);
+            $placeholders = array_map(function($field) {
+                return ":{$field}";
+            }, $fields);
+
+            $sql = "INSERT INTO " . static::$table . " 
+                    (" . implode(', ', $fields) . ") 
+                    VALUES (" . implode(', ', $placeholders) . ")";
+
+            $stmt = self::getDB()->prepare($sql);
+            $stmt->execute($allowedFields);
+
+            $userId = (int)self::getDB()->lastInsertId();
+
+            // Se houver roles para atribuir
+            if (!empty($data['roles'])) {
+                self::assignRoles($userId, (array)$data['roles']);
+            }
+
+            return $userId;
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao criar usuário: " . $e->getMessage());
+            throw $e;
         }
     }
 }

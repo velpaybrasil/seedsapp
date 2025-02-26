@@ -42,38 +42,48 @@ class AuthController extends Controller {
 
             if (!empty($errors)) {
                 error_log('Validation errors: ' . json_encode($errors));
-                $error = 'Por favor, corrija os erros no formulário: ' . implode(', ', $errors);
-                $_SESSION['form_errors'] = $errors;
-                View::render('auth/login', ['error' => $error, 'title' => 'Login - GC Manager'], 'auth');
+                $this->setFlash('error', 'Por favor, corrija os erros no formulário: ' . implode(', ', $errors));
+                $this->redirect('/login');
                 return;
             }
 
             // Tenta autenticar o usuário
-            $user = $this->userModel->validateLogin($email, $password);
+            $user = User::validateLogin($email, $password);
             error_log('User validation result: ' . ($user ? 'Success' : 'Failure'));
 
             if (!$user) {
-                $error = 'Email ou senha inválidos. Por favor, verifique suas credenciais.';
-                View::render('auth/login', ['error' => $error, 'title' => 'Login - GC Manager'], 'auth');
+                $this->setFlash('error', 'Email ou senha inválidos. Por favor, verifique suas credenciais.');
+                $this->redirect('/login');
                 return;
             }
 
+            // Verifica se a conta está bloqueada
+            if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
+                $this->setFlash('error', 'Conta temporariamente bloqueada. Tente novamente mais tarde.');
+                $this->redirect('/login');
+                return;
+            }
+
+            // Busca as permissões do usuário
+            $permissions = User::getUserPermissions($user['id']);
+            
             // Atualiza o último login
-            $this->userModel->updateLastLogin($user['id']);
+            User::updateLastLogin($user['id']);
 
             // Define as variáveis de sessão
             $_SESSION['logged_in'] = true;
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['user_email'] = $user['email'];
-            $_SESSION['user_role'] = $user['role'];
+            $_SESSION['user_permissions'] = $permissions;
+            $_SESSION['user_theme'] = $user['theme'] ?? 'light';
             error_log('Session variables set for user ID: ' . $user['id']);
 
             // Se marcou "lembrar-me", gera um token
             if ($remember) {
                 $token = bin2hex(random_bytes(32));
-                $this->userModel->update($user['id'], ['remember_token' => $token]);
-                setcookie('remember_token', $token, time() + (86400 * 30), '/');
+                User::update($user['id'], ['remember_token' => $token]);
+                setcookie('remember_token', $token, time() + (86400 * 30), '/', '', true, true);
             }
 
             $this->setFlash('success', 'Login realizado com sucesso!');
@@ -81,8 +91,8 @@ class AuthController extends Controller {
 
         } catch (\Exception $e) {
             error_log('Erro no login: ' . $e->getMessage());
-            $error = 'Erro ao realizar login. Tente novamente.';
-            View::render('auth/login', ['error' => $error, 'title' => 'Login - GC Manager'], 'auth');
+            $this->setFlash('error', 'Erro ao realizar login. Tente novamente.');
+            $this->redirect('/login');
         }
     }
 
