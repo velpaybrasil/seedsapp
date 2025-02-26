@@ -204,6 +204,49 @@ class UserController extends Controller {
         $this->redirect('/users');
     }
 
+    public function edit(int $id): void {
+        try {
+            // Busca o usuário com seus papéis
+            $user = $this->userModel->getUserWithRoles($id);
+            if (!$user) {
+                $this->setFlash('error', 'Usuário não encontrado.');
+                $this->redirect('/users');
+                return;
+            }
+
+            // Busca todos os papéis disponíveis
+            $roles = $this->roleModel->getAll();
+
+            // Prepara os dados para a view
+            View::render('users/edit', [
+                'user' => $user,
+                'roles' => $roles,
+                'title' => 'Editar Usuário'
+            ]);
+
+        } catch (\PDOException $e) {
+            error_log("[UserController] Erro ao carregar usuário para edição: " . $e->getMessage());
+            $this->setFlash('error', 'Erro ao carregar dados do usuário.');
+            $this->redirect('/users');
+        }
+    }
+
+    public function create(): void {
+        try {
+            // Busca todos os papéis disponíveis
+            $roles = $this->roleModel->getAll();
+
+            View::render('users/create', [
+                'roles' => $roles,
+                'title' => 'Novo Usuário'
+            ]);
+        } catch (\PDOException $e) {
+            error_log("[UserController] Erro ao carregar formulário de criação: " . $e->getMessage());
+            $this->setFlash('error', 'Erro ao carregar formulário.');
+            $this->redirect('/users');
+        }
+    }
+
     public function roles(): void {
         try {
             // Busca papéis com suas permissões e usuários
