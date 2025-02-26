@@ -8,6 +8,7 @@ use App\Models\Role;
 
 try {
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
     
     // Criar novo usuário
     $userId = User::create([
@@ -23,7 +24,7 @@ try {
 
     // Buscar ID do papel de administrador
     $sql = "SELECT id FROM roles WHERE name = 'Administrador' LIMIT 1";
-    $stmt = $db->prepare($sql);
+    $stmt = $pdo->prepare($sql);
     $stmt->execute();
     $adminRole = $stmt->fetch(\PDO::FETCH_ASSOC);
     
