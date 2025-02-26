@@ -20,33 +20,28 @@ class ProfileController extends Controller {
     public function showProfile() {
         try {
             // Verificar se o usuário está logado
-            if (!$this->isLoggedIn()) {
+            if (!isset($_SESSION['user_id'])) {
                 $this->setFlash('error', 'Você precisa estar logado para acessar esta página.');
                 $this->redirect('/login');
                 return;
             }
 
             // Pegar ID do usuário da sessão
-            $userId = $_SESSION['user_id'] ?? null;
-            if (!$userId) {
-                $this->setFlash('error', 'Sessão inválida.');
-                $this->redirect('/login');
-                return;
-            }
+            $userId = $_SESSION['user_id'];
             
             // Buscar dados completos do usuário
             $userDetails = $this->userModel->getUserWithRoles($userId);
             if (!$userDetails) {
                 $this->setFlash('error', 'Usuário não encontrado.');
-                $this->redirect('/dashboard');
+                $this->redirect('/login');
                 return;
             }
             
             // Preparar dados do perfil
             $profile = [
-                'id' => $userDetails['id'],
-                'name' => $userDetails['name'],
-                'email' => $userDetails['email'],
+                'id' => $userDetails['id'] ?? null,
+                'name' => $userDetails['name'] ?? null,
+                'email' => $userDetails['email'] ?? null,
                 'avatar' => $userDetails['avatar'] ?? null,
                 'phone' => $userDetails['phone'] ?? null,
                 'birth_date' => $userDetails['birth_date'] ?? null,
@@ -60,7 +55,7 @@ class ProfileController extends Controller {
                 'twitter' => $userDetails['twitter'] ?? null,
                 'linkedin' => $userDetails['linkedin'] ?? null,
                 'role' => !empty($userDetails['roles']) ? $userDetails['roles'][0]['name'] : 'Membro',
-                'joined_date' => $userDetails['created_at']
+                'joined_date' => $userDetails['created_at'] ?? date('Y-m-d H:i:s')
             ];
             
             // Preparar estatísticas
@@ -74,10 +69,10 @@ class ProfileController extends Controller {
             // Preparar atividades recentes
             $recentActivity = [
                 [
-                    'date' => date('d/m H:i'),
+                    'type' => 'message',
                     'title' => 'Bem-vindo ao Sistema',
                     'description' => 'Esta é sua primeira atividade no sistema.',
-                    'icon' => 'fas fa-envelope'
+                    'created_at' => date('Y-m-d H:i:s')
                 ]
             ];
             
@@ -118,15 +113,12 @@ class ProfileController extends Controller {
     public function updateProfile() {
         try {
             // Verificar se o usuário está logado
-            if (!$this->isLoggedIn()) {
+            if (!isset($_SESSION['user_id'])) {
                 throw new \Exception('Você precisa estar logado para atualizar seu perfil.');
             }
 
             // Pegar ID do usuário da sessão
-            $userId = $_SESSION['user_id'] ?? null;
-            if (!$userId) {
-                throw new \Exception('Sessão inválida.');
-            }
+            $userId = $_SESSION['user_id'];
             
             // Validar campos obrigatórios
             if (empty($_POST['name'])) {

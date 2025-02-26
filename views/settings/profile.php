@@ -17,10 +17,10 @@
                         <img src="<?= $profile['avatar'] ?? '/assets/img/default-avatar.png' ?>" 
                              class="img-profile rounded-circle" 
                              style="width: 150px; height: 150px; object-fit: cover;">
-                        <h4 class="mt-3"><?= htmlspecialchars($profile['name']) ?></h4>
-                        <p class="text-muted mb-1"><?= htmlspecialchars($profile['role']) ?></p>
+                        <h4 class="mt-3"><?= htmlspecialchars($profile['name'] ?? '') ?></h4>
+                        <p class="text-muted mb-1"><?= htmlspecialchars($profile['role'] ?? 'Membro') ?></p>
                         <p class="text-muted mb-4">
-                            Membro desde <?= (new DateTime($profile['joined_date']))->format('d/m/Y') ?>
+                            Membro desde <?= $profile['joined_date'] ? (new DateTime($profile['joined_date']))->format('d/m/Y') : date('d/m/Y') ?>
                         </p>
                     </div>
 
@@ -119,7 +119,7 @@
                                            class="form-control" 
                                            id="name" 
                                            name="name" 
-                                           value="<?= htmlspecialchars($profile['name']) ?>" 
+                                           value="<?= htmlspecialchars($profile['name'] ?? '') ?>" 
                                            required>
                                 </div>
                             </div>
@@ -128,7 +128,7 @@
                                     <label for="email" class="form-label">E-mail</label>
                                     <input type="email" 
                                            class="form-control" 
-                                           value="<?= htmlspecialchars($profile['email']) ?>" 
+                                           value="<?= htmlspecialchars($profile['email'] ?? '') ?>" 
                                            disabled>
                                     <small class="form-text text-muted">
                                         Para alterar seu e-mail, acesse as configurações de segurança
