@@ -7,7 +7,7 @@ WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'pgustavodlima@gmail.com');
 INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id
 FROM users u
-JOIN roles r ON r.name = 'Administrador'
+JOIN roles r ON r.name = 'admin'
 WHERE u.email = 'pgustavodlima@gmail.com'
 AND NOT EXISTS (
     SELECT 1 
