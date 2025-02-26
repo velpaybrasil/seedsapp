@@ -34,6 +34,23 @@ class User extends Model {
         }
     }
 
+    public static function findByResetToken(string $token): ?array {
+        try {
+            $db = self::getDB();
+            $sql = "SELECT * FROM " . static::$table . " 
+                    WHERE reset_token = :token 
+                    AND reset_token_expires > NOW() 
+                    AND active = 1";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute(['token' => $token]);
+            return $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao buscar usuário por token de reset: " . $e->getMessage());
+            return null;
+        }
+    }
+
     public static function validateLogin(string $email, string $password): ?array {
         try {
             error_log("[User] Iniciando validação de login para: " . $email);

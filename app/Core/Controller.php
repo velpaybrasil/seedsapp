@@ -3,11 +3,13 @@
 namespace App\Core;
 
 use App\Core\Database\Database;
+use App\Core\Session;
 
 abstract class Controller 
 {
     protected string $viewPath;
     protected Database $db;
+    protected Session $session;
     protected array $flash = [];
 
     protected function __construct() 
@@ -23,10 +25,13 @@ abstract class Controller
         }
         
         // Set view path relative to the application root
-        $this->viewPath = dirname(dirname(__DIR__)) . '/views';
+        $this->viewPath = realpath(__DIR__ . '/../../views');
         
         // Initialize database connection
         $this->db = Database::getInstance();
+        
+        // Initialize session
+        $this->session = new Session();
         
         // Initialize flash messages
         $this->flash = $_SESSION['flash'] ?? [];

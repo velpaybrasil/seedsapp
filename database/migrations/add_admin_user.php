@@ -1,8 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../../app/Core/Database/Database.php';
-require_once __DIR__ . '/../../app/Models/User.php';
-require_once __DIR__ . '/../../app/Models/Role.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 use App\Core\Database\Database;
 use App\Models\User;
@@ -19,9 +17,15 @@ try {
         'active' => 1
     ]);
 
+    if (!$userId) {
+        throw new Exception('Erro ao criar usuário');
+    }
+
     // Buscar ID do papel de administrador
-    $roleModel = new Role();
-    $adminRole = $roleModel->findByName('Administrador');
+    $sql = "SELECT id FROM roles WHERE name = 'Administrador' LIMIT 1";
+    $stmt = $db->prepare($sql);
+    $stmt->execute();
+    $adminRole = $stmt->fetch(\PDO::FETCH_ASSOC);
     
     if (!$adminRole) {
         throw new Exception('Papel de Administrador não encontrado');

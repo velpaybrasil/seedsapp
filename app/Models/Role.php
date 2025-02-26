@@ -161,4 +161,16 @@ class Role extends Model {
             return false;
         }
     }
+
+    public static function findByName(string $name): ?array {
+        try {
+            $sql = "SELECT * FROM " . static::$table . " WHERE name = :name LIMIT 1";
+            $stmt = static::getDB()->prepare($sql);
+            $stmt->execute(['name' => $name]);
+            return $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log("[Role] Erro ao buscar papel por nome: " . $e->getMessage());
+            return null;
+        }
+    }
 }
