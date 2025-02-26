@@ -86,8 +86,21 @@ class AuthController extends Controller {
             // Busca as permissões do usuário
             $permissions = User::getUserPermissions($user['id']);
             
+            // Busca o papel do usuário
+            $role = User::getUserRole($user['id']);
+            
             // Atualiza o último login
             User::updateLastLogin($user['id']);
+
+            // Inicia a sessão se ainda não foi iniciada
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+
+            // Regenera o ID da sessão de forma segura
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_regenerate_id(true);
+            }
 
             // Define as variáveis de sessão
             $_SESSION = [
@@ -95,6 +108,7 @@ class AuthController extends Controller {
                 'user_id' => $user['id'],
                 'user_name' => $user['name'],
                 'user_email' => $user['email'],
+                'user_role' => $role,
                 'user_permissions' => $permissions,
                 'user_theme' => $user['theme'] ?? 'light',
                 'CREATED' => time(),

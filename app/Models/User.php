@@ -638,6 +638,28 @@ class User extends Model {
         }
     }
 
+    public static function getUserRole(int $userId): string {
+        try {
+            $db = self::getDB();
+            $sql = "SELECT r.name as role_name 
+                    FROM users u 
+                    JOIN user_roles ur ON u.id = ur.user_id 
+                    JOIN roles r ON ur.role_id = r.id 
+                    WHERE u.id = :user_id 
+                    ORDER BY r.priority DESC 
+                    LIMIT 1";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute(['user_id' => $userId]);
+            $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            return $result ? $result['role_name'] : 'user';
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao buscar papel do usuário: " . $e->getMessage());
+            return 'user';
+        }
+    }
+
     public static function removeAllRoles(int $userId): bool {
         try {
             $db = self::getDB();
