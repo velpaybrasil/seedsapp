@@ -37,13 +37,30 @@ class AuthMiddleware implements Middleware {
             '/logs'
         ];
 
+        // Rotas de grupos e suas permissões
+        $groupRoutes = [
+            '/groups' => ['admin', 'leader', 'coordinator'],
+            '/groups/create' => ['admin', 'coordinator'],
+            '/groups/heatmap' => ['admin', 'coordinator']
+        ];
+
         // Verifica se é uma rota administrativa
         if (in_array($currentRoute, $adminRoutes)) {
-            // Verifica se o usuário é administrador
             if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'admin') {
                 http_response_code(403);
                 require_once VIEWS_PATH . '/errors/403.php';
                 return false;
+            }
+        }
+
+        // Verifica permissões para rotas de grupos
+        foreach ($groupRoutes as $route => $allowedRoles) {
+            if (strpos($currentRoute, $route) === 0) {
+                if (!isset($_SESSION['user_role']) || !in_array($_SESSION['user_role'], $allowedRoles)) {
+                    http_response_code(403);
+                    require_once VIEWS_PATH . '/errors/403.php';
+                    return false;
+                }
             }
         }
 
