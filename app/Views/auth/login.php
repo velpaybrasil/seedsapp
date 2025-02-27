@@ -32,7 +32,8 @@
                                     </div>
 
                                     <?php foreach (\App\Core\View::getFlashMessages() as $flash): ?>
-                                        <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show" role="alert">
+                                        <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show mb-4" role="alert">
+                                            <i class="fas fa-exclamation-circle mr-2"></i>
                                             <?= $flash['message'] ?>
                                             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                                                 <span aria-hidden="true">&times;</span>

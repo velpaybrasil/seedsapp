@@ -44,13 +44,13 @@ class AuthController extends Controller {
 
             // Validação básica
             if (empty($email) || empty($password)) {
-                $this->setFlash('error', 'Por favor, preencha todos os campos.');
+                $this->setFlash('warning', 'Por favor, preencha seu email e senha para fazer login.');
                 $this->redirect('/login');
                 return;
             }
 
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $this->setFlash('error', 'Por favor, forneça um email válido.');
+                $this->setFlash('warning', 'O formato do email informado não é válido. Por favor, verifique e tente novamente.');
                 $this->redirect('/login');
                 return;
             }
@@ -60,14 +60,14 @@ class AuthController extends Controller {
             error_log('[AuthController] Resultado da autenticação: ' . ($user ? 'Sucesso' : 'Falha'));
 
             if (!$user) {
-                $this->setFlash('error', 'Email ou senha inválidos.');
+                $this->setFlash('danger', 'Email ou senha incorretos. Por favor, verifique suas credenciais e tente novamente.');
                 $this->redirect('/login');
                 return;
             }
 
             // Verifica se a conta está ativa
             if (!$user['active']) {
-                $this->setFlash('error', 'Esta conta está inativa. Entre em contato com o administrador.');
+                $this->setFlash('warning', 'Sua conta está inativa. Por favor, entre em contato com o administrador do sistema para reativá-la.');
                 $this->redirect('/login');
                 return;
             }
@@ -76,7 +76,7 @@ class AuthController extends Controller {
             if (!empty($user['locked_until']) && strtotime($user['locked_until']) > time()) {
                 $lockTime = strtotime($user['locked_until']) - time();
                 $minutes = ceil($lockTime / 60);
-                $this->setFlash('error', "Conta temporariamente bloqueada. Tente novamente em {$minutes} minutos.");
+                $this->setFlash('danger', "Sua conta está temporariamente bloqueada por motivos de segurança. Você poderá tentar novamente em {$minutes} minutos.");
                 $this->redirect('/login');
                 return;
             }
