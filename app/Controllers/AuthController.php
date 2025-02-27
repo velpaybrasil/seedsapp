@@ -167,6 +167,9 @@ class AuthController extends Controller {
     }
 
     public function forgotPasswordForm(): void {
+        if ($this->isLoggedIn()) {
+            $this->redirect('/dashboard');
+        }
         View::render('auth/forgot-password', [
             'title' => 'Recuperar Senha - ' . APP_NAME
         ], 'auth');
@@ -175,132 +178,136 @@ class AuthController extends Controller {
     public function forgotPassword(): void {
         if (!$this->isPost()) {
             $this->redirect('/forgot-password');
+            return;
         }
 
-        $email = $_POST['email'] ?? '';
-
         try {
-            // Valida o email
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $this->setFlash('danger', 'Por favor, forneça um email válido.');
+            $email = filter_var(trim($_POST['email'] ?? ''), FILTER_SANITIZE_EMAIL);
+
+            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $this->setFlash('warning', 'Por favor, forneça um email válido.');
                 $this->redirect('/forgot-password');
                 return;
             }
 
             // Verifica se o usuário existe
-            $user = $this->userModel->findByEmail($email);
+            $user = User::findByEmail($email);
             if (!$user) {
-                $this->setFlash('danger', 'Não encontramos um usuário com este email.');
+                // Por segurança, não informamos se o email existe ou não
+                $this->setFlash('success', 'Se o email existir em nossa base, você receberá as instruções para redefinir sua senha.');
                 $this->redirect('/forgot-password');
                 return;
             }
 
-            // Gera um token de recuperação
+            // Gera um token único
             $token = bin2hex(random_bytes(32));
-            $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
-            
+            $expiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
             // Salva o token no banco
-            $this->userModel->update($user['id'], [
-                'reset_token' => $token,
-                'reset_token_expires' => $expires
-            ]);
+            User::saveResetToken($user['id'], $token, $expiry);
 
             // Envia o email
-            $resetLink = APP_URL . "/reset-password?token=" . $token;
-            $to = $user['email'];
+            $resetLink = APP_URL . "/reset-password?token=" . urlencode($token);
+            $to = $email;
             $subject = "Recuperação de Senha - " . APP_NAME;
-            $message = "Olá {$user['name']},\n\n";
-            $message .= "Você solicitou a recuperação de sua senha. Clique no link abaixo para criar uma nova senha:\n\n";
+            $message = "Olá,\n\n";
+            $message .= "Você solicitou a recuperação de senha. Clique no link abaixo para redefinir sua senha:\n\n";
             $message .= $resetLink . "\n\n";
             $message .= "Este link é válido por 1 hora.\n\n";
             $message .= "Se você não solicitou esta recuperação, ignore este email.\n\n";
-            $message .= "Atenciosamente,\n" . APP_NAME;
+            $message .= "Atenciosamente,\n";
+            $message .= APP_NAME;
 
-            mail($to, $subject, $message);
+            $headers = "From: " . APP_EMAIL . "\r\n";
+            $headers .= "Reply-To: " . APP_EMAIL . "\r\n";
+            $headers .= "X-Mailer: PHP/" . phpversion();
 
-            $this->setFlash('success', 'Enviamos um email com instruções para recuperar sua senha.');
-            $this->redirect('/login');
+            mail($to, $subject, $message, $headers);
+
+            $this->setFlash('success', 'Se o email existir em nossa base, você receberá as instruções para redefinir sua senha.');
+            $this->redirect('/forgot-password');
 
         } catch (\Exception $e) {
-            error_log('Erro na recuperação de senha: ' . $e->getMessage());
-            $this->setFlash('danger', 'Erro ao processar sua solicitação. Tente novamente.');
+            error_log('[AuthController] Erro ao processar recuperação de senha: ' . $e->getMessage());
+            $this->setFlash('danger', 'Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.');
             $this->redirect('/forgot-password');
         }
     }
 
     public function resetPasswordForm(): void {
+        if ($this->isLoggedIn()) {
+            $this->redirect('/dashboard');
+        }
+
         $token = $_GET['token'] ?? '';
         if (empty($token)) {
-            $this->setFlash('danger', 'Token inválido.');
+            $this->setFlash('danger', 'Token de recuperação inválido.');
+            $this->redirect('/login');
+            return;
+        }
+
+        // Verifica se o token é válido e não expirou
+        $user = User::findByResetToken($token);
+        if (!$user || strtotime($user['reset_token_expires']) < time()) {
+            $this->setFlash('danger', 'O link de recuperação é inválido ou expirou.');
             $this->redirect('/login');
             return;
         }
 
         View::render('auth/reset-password', [
-            'token' => $token,
-            'title' => 'Nova Senha - ' . APP_NAME
+            'title' => 'Redefinir Senha - ' . APP_NAME,
+            'token' => $token
         ], 'auth');
     }
 
     public function resetPassword(): void {
         if (!$this->isPost()) {
             $this->redirect('/login');
+            return;
         }
 
-        $token = $_POST['token'] ?? '';
-        $password = $_POST['password'] ?? '';
-        $passwordConfirm = $_POST['password_confirm'] ?? '';
-
         try {
-            // Validações básicas
+            $token = $_POST['token'] ?? '';
+            $password = $_POST['password'] ?? '';
+            $passwordConfirm = $_POST['password_confirm'] ?? '';
+
             if (empty($token) || empty($password) || empty($passwordConfirm)) {
-                $this->setFlash('danger', 'Todos os campos são obrigatórios.');
-                $this->redirect('/reset-password?token=' . $token);
+                $this->setFlash('warning', 'Todos os campos são obrigatórios.');
+                $this->redirect("/reset-password?token=" . urlencode($token));
                 return;
             }
 
             if ($password !== $passwordConfirm) {
-                $this->setFlash('danger', 'As senhas não coincidem.');
-                $this->redirect('/reset-password?token=' . $token);
+                $this->setFlash('warning', 'As senhas não coincidem.');
+                $this->redirect("/reset-password?token=" . urlencode($token));
                 return;
             }
 
-            if (strlen($password) < 6) {
-                $this->setFlash('danger', 'A senha deve ter pelo menos 6 caracteres.');
-                $this->redirect('/reset-password?token=' . $token);
+            if (strlen($password) < 8) {
+                $this->setFlash('warning', 'A senha deve ter pelo menos 8 caracteres.');
+                $this->redirect("/reset-password?token=" . urlencode($token));
                 return;
             }
 
-            // Busca o usuário pelo token
-            $user = $this->userModel->findByResetToken($token);
-            if (!$user) {
-                $this->setFlash('danger', 'Token inválido ou expirado.');
+            // Verifica se o token é válido e não expirou
+            $user = User::findByResetToken($token);
+            if (!$user || strtotime($user['reset_token_expires']) < time()) {
+                $this->setFlash('danger', 'O link de recuperação é inválido ou expirou.');
                 $this->redirect('/login');
                 return;
             }
 
-            // Verifica se o token expirou
-            if (strtotime($user['reset_token_expires']) < time()) {
-                $this->setFlash('danger', 'Token expirado. Solicite uma nova recuperação de senha.');
-                $this->redirect('/forgot-password');
-                return;
-            }
+            // Atualiza a senha e limpa o token
+            User::updatePassword($user['id'], password_hash($password, PASSWORD_DEFAULT));
+            User::clearResetToken($user['id']);
 
-            // Atualiza a senha
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            $this->userModel->update($user['id'], [
-                'password' => $hashedPassword,
-                'reset_token' => null,
-                'reset_token_expires' => null
-            ]);
-
-            $this->setFlash('success', 'Senha alterada com sucesso! Faça login com sua nova senha.');
+            $this->setFlash('success', 'Sua senha foi atualizada com sucesso! Você já pode fazer login com sua nova senha.');
             $this->redirect('/login');
 
         } catch (\Exception $e) {
-            error_log('Erro na redefinição de senha: ' . $e->getMessage());
-            $this->setFlash('danger', 'Erro ao redefinir sua senha. Tente novamente.');
-            $this->redirect('/reset-password?token=' . $token);
+            error_log('[AuthController] Erro ao redefinir senha: ' . $e->getMessage());
+            $this->setFlash('danger', 'Ocorreu um erro ao redefinir sua senha. Por favor, tente novamente.');
+            $this->redirect('/login');
         }
     }
 

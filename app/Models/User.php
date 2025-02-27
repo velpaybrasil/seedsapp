@@ -672,6 +672,43 @@ class User extends Model {
         }
     }
 
+    public static function saveResetToken(int $userId, string $token, string $expiry): void {
+        try {
+            $db = self::getDB();
+            $stmt = $db->prepare("UPDATE " . static::$table . " SET reset_token = :token, reset_token_expires = :expiry WHERE id = :id");
+            $stmt->execute([
+                'id' => $userId,
+                'token' => $token,
+                'expiry' => $expiry
+            ]);
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao salvar token de reset: " . $e->getMessage());
+        }
+    }
+
+    public static function updatePassword(int $userId, string $hashedPassword): void {
+        try {
+            $db = self::getDB();
+            $stmt = $db->prepare("UPDATE " . static::$table . " SET password = :password WHERE id = :id");
+            $stmt->execute([
+                'id' => $userId,
+                'password' => $hashedPassword
+            ]);
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao atualizar senha: " . $e->getMessage());
+        }
+    }
+
+    public static function clearResetToken(int $userId): void {
+        try {
+            $db = self::getDB();
+            $stmt = $db->prepare("UPDATE " . static::$table . " SET reset_token = NULL, reset_token_expires = NULL WHERE id = :id");
+            $stmt->execute(['id' => $userId]);
+        } catch (\PDOException $e) {
+            error_log("[User] Erro ao limpar token de reset: " . $e->getMessage());
+        }
+    }
+
     public static function update($id, $data) {
         try {
             $db = self::getDB();
