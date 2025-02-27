@@ -20,7 +20,7 @@ class AuthController extends Controller {
         }
         View::render('auth/login', [
             'title' => 'Login - ' . APP_NAME
-        ], 'auth');
+        ], null);
     }
 
     public function login(): void {
@@ -102,50 +102,20 @@ class AuthController extends Controller {
                 session_regenerate_id(true);
             }
 
-            // Define as variáveis de sessão
-            $_SESSION = [
-                'logged_in' => true,
-                'user_id' => $user['id'],
-                'user_name' => $user['name'],
-                'user_email' => $user['email'],
-                'user_role' => $role,
-                'user_permissions' => $permissions,
-                'user_theme' => $user['theme'] ?? 'light',
-                'CREATED' => time(),
-                'LAST_ACTIVITY' => time()
-            ];
+            // Configura a sessão
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_name'] = $user['name'];
+            $_SESSION['user_email'] = $user['email'];
+            $_SESSION['user_role'] = $role;
+            $_SESSION['user_permissions'] = $permissions;
+            $_SESSION['last_activity'] = time();
 
-            error_log('[AuthController] Sessão configurada com sucesso');
-
-            // Se marcou "lembrar-me", gera um token
-            if ($remember) {
-                $token = bin2hex(random_bytes(32));
-                $hashedToken = password_hash($token, PASSWORD_DEFAULT);
-                
-                User::update($user['id'], ['remember_token' => $hashedToken]);
-                
-                // Cookie seguro com httponly
-                setcookie(
-                    'remember_token',
-                    $token,
-                    [
-                        'expires' => time() + (86400 * 30),
-                        'path' => '/',
-                        'domain' => '',
-                        'secure' => true,
-                        'httponly' => true,
-                        'samesite' => 'Strict'
-                    ]
-                );
-                error_log('[AuthController] Token de "lembrar-me" configurado');
-            }
-
-            $this->setFlash('success', 'Login realizado com sucesso!');
+            // Redireciona para o dashboard
             $this->redirect('/dashboard');
 
         } catch (\Exception $e) {
             error_log('[AuthController] Erro no login: ' . $e->getMessage());
-            $this->setFlash('error', 'Erro ao realizar login. Por favor, tente novamente.');
+            $this->setFlash('danger', 'Ocorreu um erro ao tentar fazer login. Por favor, tente novamente.');
             $this->redirect('/login');
         }
     }
@@ -171,8 +141,9 @@ class AuthController extends Controller {
             $this->redirect('/dashboard');
         }
         View::render('auth/forgot-password', [
-            'title' => 'Recuperar Senha - ' . APP_NAME
-        ]);
+            'title' => 'Recuperar Senha - ' . APP_NAME,
+            'flash_messages' => View::getFlashMessages()
+        ], null);
     }
 
     public function forgotPassword(): void {
@@ -256,8 +227,9 @@ class AuthController extends Controller {
 
         View::render('auth/reset-password', [
             'title' => 'Redefinir Senha - ' . APP_NAME,
-            'token' => $token
-        ]);
+            'token' => $token,
+            'flash_messages' => View::getFlashMessages()
+        ], null);
     }
 
     public function resetPassword(): void {
