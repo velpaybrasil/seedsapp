@@ -24,6 +24,12 @@ Router::get('/login', [AuthController::class, 'loginForm']);
 Router::post('/login', [AuthController::class, 'login']);
 Router::get('/logout', [AuthController::class, 'logout']);
 
+// Rotas de recuperação de senha
+Router::get('/forgot-password', [AuthController::class, 'forgotPasswordForm']);
+Router::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+Router::get('/reset-password', [AuthController::class, 'resetPasswordForm']);
+Router::post('/reset-password', [AuthController::class, 'resetPassword']);
+
 // Formulário público de visitantes (sem autenticação)
 Router::get('/public/visitor-form', [PublicController::class, 'visitorForm']);
 Router::post('/public/visitor-form/store', [PublicController::class, 'storeVisitor']);
