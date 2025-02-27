@@ -4,7 +4,7 @@
 define('APP_NAME', 'SeedsApp');
 define('CHURCH_NAME', isset($_ENV['CHURCH_NAME']) ? $_ENV['CHURCH_NAME'] : 'Igreja');
 define('PUBLIC_PATH', realpath(__DIR__ . '/../public'));
-define('VIEWS_PATH', realpath(__DIR__ . '/../views'));
+define('VIEWS_PATH', realpath(__DIR__ . '/Views'));
 define('STORAGE_PATH', realpath(__DIR__ . '/../storage'));
 
 // URL e Email

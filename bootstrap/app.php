@@ -113,9 +113,25 @@ if (!defined('VIEWS_PATH')) {
     error_log("VIEWS_PATH defined as: " . VIEWS_PATH);
 }
 
-// Inicializa a View
-View::init(VIEWS_PATH);
-error_log("View initialized with path: " . VIEWS_PATH);
+// Carrega as constantes da aplicação
+require_once ROOT_PATH . '/app/constants.php';
+error_log("Constants loaded");
+
+// Inicializa o View com o VIEWS_PATH
+\App\Core\View::init(VIEWS_PATH);
+error_log("View initialized with VIEWS_PATH: " . VIEWS_PATH);
+
+// Configuração de segurança para headers
+header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 1; mode=block');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+
+// Strict Transport Security em produção
+if (APP_ENV === 'production') {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
 
 // Configurações do banco de dados
 try {
@@ -157,13 +173,5 @@ error_log("Timezone set to: America/Sao_Paulo");
 // Configuração de locale
 setlocale(LC_ALL, 'pt_BR.UTF-8', 'pt_BR', 'Portuguese_Brazil');
 error_log("Locale configured");
-
-// Configuração de headers
-header('X-Frame-Options: SAMEORIGIN');
-header('X-XSS-Protection: 1; mode=block');
-header('X-Content-Type-Options: nosniff');
-if (APP_ENV === 'production') {
-    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
-}
 
 error_log("Bootstrap completed successfully");
