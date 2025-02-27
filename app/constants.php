@@ -7,6 +7,10 @@ define('PUBLIC_PATH', realpath(__DIR__ . '/../public'));
 define('VIEWS_PATH', realpath(__DIR__ . '/../views'));
 define('STORAGE_PATH', realpath(__DIR__ . '/../storage'));
 
+// URL e Email
+define('APP_URL', isset($_ENV['APP_URL']) ? $_ENV['APP_URL'] : 'https://igrejamodelo.alfadev.online');
+define('APP_EMAIL', isset($_ENV['APP_EMAIL']) ? $_ENV['APP_EMAIL'] : 'no-reply@igrejamodelo.alfadev.online');
+
 // Default Timezone
 date_default_timezone_set('America/Sao_Paulo');
 
