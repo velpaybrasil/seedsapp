@@ -12,47 +12,12 @@ class Database {
         if (self::$connection === null) {
             try {
                 error_log("[Database] Initializing database connection...");
-
-                // Load database configuration
-                $configPath = __DIR__ . '/../../config/database.php';
-                if (!file_exists($configPath)) {
-                    error_log("[Database] Database configuration file not found: {$configPath}");
-                    throw new PDOException('Database configuration file not found');
-                }
-
-                $config = require $configPath;
-                if (!isset($config['default']) || !is_array($config['default'])) {
-                    error_log("[Database] Invalid database configuration");
-                    throw new PDOException('Invalid database configuration');
-                }
-
-                $dbConfig = $config['default'];
-
-                // Validate required configuration
-                $required = ['host', 'database', 'username', 'password'];
-                foreach ($required as $field) {
-                    if (empty($dbConfig[$field])) {
-                        error_log("[Database] Missing required database configuration: {$field}");
-                        throw new PDOException("Missing required database configuration: {$field}");
-                    }
-                }
-
-                // Build DSN
-                $dsn = sprintf(
-                    '%s:host=%s;dbname=%s;charset=%s',
-                    $dbConfig['driver'] ?? 'mysql',
-                    $dbConfig['host'],
-                    $dbConfig['database'],
-                    $dbConfig['charset'] ?? 'utf8mb4'
-                );
-
-                error_log("[Database] Connecting to database: {$dsn}");
-
+                
                 // Create connection with error mode set
                 self::$connection = new PDO(
-                    $dsn,
-                    $dbConfig['username'],
-                    $dbConfig['password'],
+                    "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+                    DB_USER,
+                    DB_PASS,
                     [
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -63,12 +28,16 @@ class Database {
 
                 error_log("[Database] Database connection established successfully");
             } catch (PDOException $e) {
-                error_log("[Database] Connection error: " . $e->getMessage());
-                throw $e;
+                error_log("[Database] Connection failed: " . $e->getMessage());
+                throw new PDOException("Database connection failed: " . $e->getMessage());
             }
         }
 
         return self::$connection;
+    }
+
+    public static function setConnection(PDO $connection): void {
+        self::$connection = $connection;
     }
 
     public static function beginTransaction(): bool {
