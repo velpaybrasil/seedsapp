@@ -24,7 +24,7 @@
 
 <body class="auth-page">
     <div class="auth-wrapper">
-        <?= content() ?>
+        <?php \App\Core\View::renderSection('content') ?>
     </div>
 
     <!-- Bootstrap Bundle with Popper -->
