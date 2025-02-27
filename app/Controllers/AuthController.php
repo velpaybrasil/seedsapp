@@ -20,7 +20,7 @@ class AuthController extends Controller {
         }
         View::render('auth/login', [
             'title' => 'Login - ' . APP_NAME
-        ], null);
+        ]);
     }
 
     public function login(): void {
@@ -143,7 +143,7 @@ class AuthController extends Controller {
         View::render('auth/forgot-password', [
             'title' => 'Recuperar Senha - ' . APP_NAME,
             'flash_messages' => View::getFlashMessages()
-        ], null);
+        ]);
     }
 
     public function forgotPassword(): void {
@@ -229,7 +229,7 @@ class AuthController extends Controller {
             'title' => 'Redefinir Senha - ' . APP_NAME,
             'token' => $token,
             'flash_messages' => View::getFlashMessages()
-        ], null);
+        ]);
     }
 
     public function resetPassword(): void {
