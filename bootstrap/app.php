@@ -37,15 +37,9 @@ error_log("Composer autoloader loaded");
 require_once ROOT_PATH . '/app/helpers.php';
 error_log("Helpers loaded");
 
-// Carrega as constantes da aplicação se ainda não foram carregadas
-if (!defined('APP_NAME')) {
-    require_once ROOT_PATH . '/app/constants.php';
-    error_log("Constants loaded");
-}
-
-// Inicializa o View com o VIEWS_PATH
-\App\Core\View::init(VIEWS_PATH);
-error_log("View initialized with VIEWS_PATH: " . VIEWS_PATH);
+// Carrega as constantes da aplicação
+require_once ROOT_PATH . '/app/constants.php';
+error_log("Constants loaded");
 
 // Inicia a sessão antes de qualquer output
 if (session_status() === PHP_SESSION_NONE) {
@@ -59,6 +53,10 @@ if (session_status() === PHP_SESSION_NONE) {
     }
 }
 
+// Inicializa o View com o VIEWS_PATH
+\App\Core\View::init(VIEWS_PATH);
+error_log("View initialized with VIEWS_PATH: " . VIEWS_PATH);
+
 // Configuração de segurança para headers
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
@@ -67,7 +65,7 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 
 // Strict Transport Security em produção
-if (APP_ENV === 'production') {
+if (defined('APP_ENV') && APP_ENV === 'production') {
     header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 }
 
