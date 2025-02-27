@@ -24,7 +24,6 @@ try {
 
     // Carrega as configurações
     require_once ROOT_PATH . '/config/app.php';
-    require_once ROOT_PATH . '/config/database.php';
 
     // Verifica o diretório de logs
     if (!file_exists(ROOT_PATH . '/storage/logs')) {
@@ -49,13 +48,16 @@ try {
     Router::dispatch();
 
 } catch (Exception $e) {
-    error_log("Application error: " . $e->getMessage());
-    if (APP_DEBUG) {
-        echo "<h1>Application Error</h1>";
-        echo "<p>" . $e->getMessage() . "</p>";
-        echo "<pre>" . $e->getTraceAsString() . "</pre>";
+    error_log("Error: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    
+    if (defined('APP_ENV') && APP_ENV === 'development') {
+        echo "<pre>";
+        echo "Error: " . $e->getMessage() . "\n";
+        echo "Stack trace:\n" . $e->getTraceAsString();
+        echo "</pre>";
     } else {
-        echo "<h1>Internal Server Error</h1>";
-        echo "<p>An error occurred. Please try again later.</p>";
+        http_response_code(500);
+        echo "Internal Server Error";
     }
 }
