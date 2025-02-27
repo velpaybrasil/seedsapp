@@ -172,7 +172,7 @@ class AuthController extends Controller {
         }
         View::render('auth/forgot-password', [
             'title' => 'Recuperar Senha - ' . APP_NAME
-        ], 'auth');
+        ]);
     }
 
     public function forgotPassword(): void {
@@ -218,8 +218,8 @@ class AuthController extends Controller {
             $message .= "Atenciosamente,\n";
             $message .= APP_NAME;
 
-            $headers = "From: " . APP_EMAIL . "\r\n";
-            $headers .= "Reply-To: " . APP_EMAIL . "\r\n";
+            $headers = "From: " . \APP_EMAIL . "\r\n";
+            $headers .= "Reply-To: " . \APP_EMAIL . "\r\n";
             $headers .= "X-Mailer: PHP/" . phpversion();
 
             mail($to, $subject, $message, $headers);
@@ -257,7 +257,7 @@ class AuthController extends Controller {
         View::render('auth/reset-password', [
             'title' => 'Redefinir Senha - ' . APP_NAME,
             'token' => $token
-        ], 'auth');
+        ]);
     }
 
     public function resetPassword(): void {
