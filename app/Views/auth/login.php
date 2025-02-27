@@ -1,86 +1,151 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Login - <?= APP_NAME ?></title>
+<?php require_once VIEWS_PATH . '/layouts/blank.php'; ?>
 
-    <!-- Custom fonts for this template-->
-    <link href="<?= asset('vendor/fontawesome-free/css/all.min.css') ?>" rel="stylesheet" type="text/css">
-    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+<?php section('content'); ?>
+<div class="auth-card">
+    <div class="auth-header">
+        <img src="<?= asset('img/logo.png') ?>" alt="<?= APP_NAME ?>" class="auth-logo floating">
+        <h4 class="text-primary mb-2">Bem-vindo ao <?= APP_NAME ?></h4>
+        <p class="text-muted">Faça login para continuar</p>
+    </div>
 
-    <!-- Custom styles for this template-->
-    <link href="<?= asset('css/sb-admin-2.min.css') ?>" rel="stylesheet">
-    <link href="<?= asset('css/style.css') ?>" rel="stylesheet">
-</head>
+    <?php if (isset($_SESSION['flash'])): ?>
+        <div class="alert alert-<?= $_SESSION['flash']['type'] ?> alert-dismissible fade show mx-3" role="alert">
+            <?= $_SESSION['flash']['message'] ?>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
-<body class="bg-gradient-primary">
-    <div class="container">
-        <!-- Outer Row -->
-        <div class="row justify-content-center">
-            <div class="col-xl-10 col-lg-12 col-md-9">
-                <div class="card o-hidden border-0 shadow-lg my-5">
-                    <div class="card-body p-0">
-                        <!-- Nested Row within Card Body -->
-                        <div class="row">
-                            <div class="col-lg-6 d-none d-lg-block bg-login-image"></div>
-                            <div class="col-lg-6">
-                                <div class="p-5">
-                                    <div class="text-center">
-                                        <h1 class="h4 text-gray-900 mb-4">Bem-vindo ao <?= APP_NAME ?>!</h1>
-                                    </div>
-
-                                    <?php foreach (\App\Core\View::getFlashMessages() as $flash): ?>
-                                        <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show mb-4" role="alert">
-                                            <i class="fas fa-exclamation-circle mr-2"></i>
-                                            <?= $flash['message'] ?>
-                                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
-                                        </div>
-                                    <?php endforeach; ?>
-
-                                    <form class="user" action="/login" method="POST">
-                                        <div class="form-group">
-                                            <input type="email" class="form-control form-control-user" id="email" name="email" 
-                                                placeholder="Digite seu e-mail..." required>
-                                        </div>
-                                        <div class="form-group">
-                                            <input type="password" class="form-control form-control-user" id="password" name="password"
-                                                placeholder="Digite sua senha..." required>
-                                        </div>
-                                        <div class="form-group">
-                                            <div class="custom-control custom-checkbox small">
-                                                <input type="checkbox" class="custom-control-input" id="remember" name="remember">
-                                                <label class="custom-control-label" for="remember">Lembrar-me</label>
-                                            </div>
-                                        </div>
-                                        <button type="submit" class="btn btn-primary btn-user btn-block">
-                                            Entrar
-                                        </button>
-                                    </form>
-                                    <hr>
-                                    <div class="text-center">
-                                        <a class="small" href="/forgot-password">Esqueceu sua senha?</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+    <div class="auth-form">
+        <form action="<?= url('login') ?>" method="POST" id="loginForm" novalidate>
+            <?= csrf_field() ?>
+            
+            <div class="mb-3">
+                <label for="email" class="form-label">E-mail</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-envelope"></i>
+                    </span>
+                    <input type="email" 
+                           class="form-control <?= isset($_SESSION['errors']['email']) ? 'is-invalid' : '' ?>" 
+                           id="email" 
+                           name="email" 
+                           value="<?= old('email') ?>"
+                           required 
+                           autofocus
+                           autocomplete="email"
+                           placeholder="seu@email.com">
+                    <div class="invalid-feedback">
+                        <?= isset($_SESSION['errors']['email']) ? $_SESSION['errors']['email'] : 'Por favor, insira um e-mail válido.' ?>
                     </div>
                 </div>
             </div>
-        </div>
+
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label for="password" class="form-label mb-0">Senha</label>
+                    <a href="<?= url('forgot-password') ?>" class="small">
+                        Esqueceu a senha?
+                    </a>
+                </div>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-lock"></i>
+                    </span>
+                    <input type="password" 
+                           class="form-control <?= isset($_SESSION['errors']['password']) ? 'is-invalid' : '' ?>" 
+                           id="password" 
+                           name="password" 
+                           required
+                           autocomplete="current-password"
+                           placeholder="Sua senha">
+                    <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <div class="invalid-feedback">
+                        <?= isset($_SESSION['errors']['password']) ? $_SESSION['errors']['password'] : 'Por favor, insira sua senha.' ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                    <label class="form-check-label user-select-none" for="remember">
+                        Lembrar-me
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mb-3" id="submitButton">
+                <span class="d-flex align-items-center justify-content-center">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                    <span>Entrar</span>
+                    <div class="spinner-border spinner-border-sm ms-2 d-none" role="status" id="submitSpinner">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </span>
+            </button>
+
+            <a href="https://wa.me/5585997637850" target="_blank" class="btn btn-outline-secondary w-100 mb-4">
+                <span class="d-flex align-items-center justify-content-center">
+                    <i class="bi bi-whatsapp me-2"></i>
+                    <span>Suporte via WhatsApp</span>
+                </span>
+            </a>
+
+            <div class="text-center text-muted small">
+                &copy; <?= date('Y') ?> <?= APP_NAME ?>. Todos os direitos reservados.
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Bootstrap core JavaScript-->
-    <script src="<?= asset('vendor/jquery/jquery.min.js') ?>"></script>
-    <script src="<?= asset('vendor/bootstrap/js/bootstrap.bundle.min.js') ?>"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('loginForm');
+    const submitButton = document.getElementById('submitButton');
+    const submitSpinner = document.getElementById('submitSpinner');
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
 
-    <!-- Core plugin JavaScript-->
-    <script src="<?= asset('vendor/jquery-easing/jquery.easing.min.js') ?>"></script>
+    // Toggle password visibility
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        this.querySelector('i').classList.toggle('bi-eye');
+        this.querySelector('i').classList.toggle('bi-eye-slash');
+    });
 
-    <!-- Custom scripts for all pages-->
-    <script src="<?= asset('js/sb-admin-2.min.js') ?>"></script>
-</body>
-</html>
+    // Form validation and submission
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        } else {
+            submitButton.disabled = true;
+            submitSpinner.classList.remove('d-none');
+        }
+        form.classList.add('was-validated');
+    });
+
+    // Remove validation class when input changes
+    const inputs = form.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.addEventListener('input', function() {
+            if (form.classList.contains('was-validated')) {
+                this.classList.remove('is-invalid');
+            }
+        });
+    });
+
+    // Auto-hide alerts after 5 seconds
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }, 5000);
+    });
+});
+</script>
+<?php endsection(); ?>
