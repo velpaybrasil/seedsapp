@@ -5,7 +5,7 @@ use App\Core\Router;
 if (!function_exists('asset')) {
     function asset(string $path): string {
         $basePath = Router::getBasePath();
-        return $basePath . '/public/' . ltrim($path, '/');
+        return $basePath . '/' . ltrim($path, '/');
     }
 }
 
