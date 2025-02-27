@@ -37,9 +37,11 @@ error_log("Composer autoloader loaded");
 require_once ROOT_PATH . '/app/helpers.php';
 error_log("Helpers loaded");
 
-// Carrega as constantes da aplicação
-require_once ROOT_PATH . '/app/constants.php';
-error_log("Constants loaded");
+// Carrega as constantes da aplicação se ainda não foram carregadas
+if (!defined('APP_NAME')) {
+    require_once ROOT_PATH . '/app/constants.php';
+    error_log("Constants loaded");
+}
 
 // Inicializa o View com o VIEWS_PATH
 \App\Core\View::init(VIEWS_PATH);
