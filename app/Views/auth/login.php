@@ -1,4 +1,3 @@
-<?php \App\Core\View::section('content') ?>
 <div class="auth-card">
     <div class="auth-header">
         <img src="<?= asset('img/logo.png') ?>" alt="<?= APP_NAME ?>" class="auth-logo floating">
@@ -121,4 +120,3 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-<?php \App\Core\View::endSection() ?>
