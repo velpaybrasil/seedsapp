@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="h-100">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,9 +23,9 @@
 </head>
 
 <body class="auth-page">
-    <div class="auth-wrapper">
+    <main class="auth-wrapper">
         <?php \App\Core\View::renderSection('content') ?>
-    </div>
+    </main>
 
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
