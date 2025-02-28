@@ -88,9 +88,9 @@ class Deployer {
     private function setupRootHtaccess() {
         echo "Configurando .htaccess na raiz...\n";
         
-        $htaccessContent = "
+        $htaccessContent = <<<EOT
 # Proteger arquivos e diretórios
-<FilesMatch \"^\.">
+<FilesMatch "^\.">
     Order allow,deny
     Deny from all
 </FilesMatch>
@@ -101,9 +101,9 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^$ public_html/ [L]
-    RewriteRule (.*) public_html/$1 [L]
+    RewriteRule (.*) public_html/\$1 [L]
 </IfModule>
-        ";
+EOT;
         
         file_put_contents($this->deployPath . '/.htaccess', $htaccessContent);
         echo ".htaccess configurado com sucesso!\n";
