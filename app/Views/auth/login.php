@@ -2,13 +2,13 @@
     <div class="auth-header">
         <img src="<?= asset('img/logo.png') ?>" alt="<?= APP_NAME ?>" class="auth-logo floating">
         <h4 class="text-primary mb-2">Bem-vindo ao <?= APP_NAME ?></h4>
-        <p class="text-muted">Faça login para continuar</p>
+        <p class="text-muted mb-4">Faça login para continuar</p>
     </div>
 
     <?php if (isset($_SESSION['flash'])): ?>
-        <div class="alert alert-<?= $_SESSION['flash']['type'] ?> alert-dismissible fade show mx-3" role="alert">
+        <div class="alert alert-<?= $_SESSION['flash']['type'] ?> alert-dismissible fade show" role="alert">
             <?= $_SESSION['flash']['message'] ?>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     <?php endif; ?>
 
@@ -31,16 +31,18 @@
                            autofocus
                            autocomplete="email"
                            placeholder="seu@email.com">
-                    <div class="invalid-feedback">
-                        <?= isset($_SESSION['errors']['email']) ? $_SESSION['errors']['email'] : 'Por favor, insira um e-mail válido.' ?>
-                    </div>
                 </div>
+                <?php if (isset($_SESSION['errors']['email'])): ?>
+                    <div class="invalid-feedback d-block">
+                        <?= $_SESSION['errors']['email'] ?>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <label for="password" class="form-label mb-0">Senha</label>
-                    <a href="<?= url('forgot-password') ?>" class="small">
+                    <a href="<?= url('forgot-password') ?>" class="small text-primary text-decoration-none">
                         Esqueceu a senha?
                     </a>
                 </div>
@@ -58,10 +60,12 @@
                     <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                         <i class="bi bi-eye"></i>
                     </button>
-                    <div class="invalid-feedback">
-                        <?= isset($_SESSION['errors']['password']) ? $_SESSION['errors']['password'] : 'Por favor, insira sua senha.' ?>
-                    </div>
                 </div>
+                <?php if (isset($_SESSION['errors']['password'])): ?>
+                    <div class="invalid-feedback d-block">
+                        <?= $_SESSION['errors']['password'] ?>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <div class="mb-4">
@@ -118,5 +122,4 @@ document.addEventListener('DOMContentLoaded', function() {
         submitButton.setAttribute('disabled', 'disabled');
         submitSpinner.classList.remove('d-none');
     });
-});
-</script>
+});</script>
