@@ -24,6 +24,9 @@ Router::get('/login', [AuthController::class, 'loginForm']);
 Router::post('/login', [AuthController::class, 'login']);
 Router::get('/logout', [AuthController::class, 'logout']);
 
+// Rota de teste para log
+Router::get('/test-log', [PublicController::class, 'testLog']);
+
 // Rotas de recuperação de senha
 Router::get('/forgot-password', [AuthController::class, 'forgotPasswordForm']);
 Router::post('/forgot-password', [AuthController::class, 'forgotPassword']);

@@ -67,4 +67,14 @@ class PublicController extends Controller {
     public function success() {
         View::render('public/success');
     }
+    
+    public function testLog() {
+        try {
+            // Forçar um erro para testar o log
+            $undefinedVariable = $nonExistentVariable;
+        } catch (\Throwable $e) {
+            error_log("Teste de log: " . $e->getMessage());
+            echo "Erro gerado com sucesso. Verifique o arquivo de log.";
+        }
+    }
 }
