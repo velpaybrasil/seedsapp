@@ -1,16 +1,17 @@
 /* Auth Page */
 .auth-page {
-    background: linear-gradient(135deg, #3498db, #2980b9);
     min-height: 100vh;
+    background: linear-gradient(135deg, #3498db, #2980b9);
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 2rem 1rem;
 }
 
 .auth-wrapper {
     width: 100%;
     max-width: 420px;
-    margin: 2rem;
+    margin: auto;
 }
 
 .auth-card {
@@ -18,12 +19,6 @@
     border-radius: 1rem;
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
     overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.auth-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.15);
 }
 
 .auth-header {
@@ -41,6 +36,18 @@
     animation: float 3s ease-in-out infinite;
 }
 
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
 .auth-form {
     padding: 0 2rem 2rem;
 }
@@ -49,6 +56,7 @@
 .input-group-text {
     background-color: transparent;
     border-right: none;
+    color: #6c757d;
 }
 
 .form-control {
@@ -56,7 +64,11 @@
 }
 
 .form-control:focus {
+    border-color: #ced4da;
     box-shadow: none;
+}
+
+.form-control:focus + .input-group-text {
     border-color: #ced4da;
 }
 
@@ -78,25 +90,28 @@
 }
 
 .btn-outline-secondary {
+    border-left: none;
     border-color: #ced4da;
 }
 
-.btn-outline-secondary:hover {
-    background-color: #f8f9fa;
-    border-color: #ced4da;
-    color: #6c757d;
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus {
+    background-color: transparent;
+    color: #0d6efd;
 }
 
-/* Floating Animation */
-@keyframes float {
-    0% {
-        transform: translateY(0px);
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .auth-wrapper {
+        margin: 1rem;
     }
-    50% {
-        transform: translateY(-10px);
+    
+    .auth-header {
+        padding: 1.5rem 1.5rem 0.5rem;
     }
-    100% {
-        transform: translateY(0px);
+    
+    .auth-form {
+        padding: 0 1.5rem 1.5rem;
     }
 }
 

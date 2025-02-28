@@ -1,3 +1,4 @@
+<?php \App\Core\View::section('content') ?>
 <div class="auth-card">
     <div class="auth-header">
         <img src="<?= asset('img/logo.png') ?>" alt="<?= APP_NAME ?>" class="auth-logo floating">
@@ -109,39 +110,15 @@ document.addEventListener('DOMContentLoaded', function() {
     togglePassword.addEventListener('click', function() {
         const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
         passwordInput.setAttribute('type', type);
-        this.querySelector('i').classList.toggle('bi-eye');
-        this.querySelector('i').classList.toggle('bi-eye-slash');
+        togglePassword.querySelector('i').classList.toggle('bi-eye');
+        togglePassword.querySelector('i').classList.toggle('bi-eye-slash');
     });
 
-    // Form validation and submission
-    form.addEventListener('submit', function(event) {
-        if (!form.checkValidity()) {
-            event.preventDefault();
-            event.stopPropagation();
-        } else {
-            submitButton.disabled = true;
-            submitSpinner.classList.remove('d-none');
-        }
-        form.classList.add('was-validated');
-    });
-
-    // Remove validation class when input changes
-    const inputs = form.querySelectorAll('input');
-    inputs.forEach(input => {
-        input.addEventListener('input', function() {
-            if (form.classList.contains('was-validated')) {
-                this.classList.remove('is-invalid');
-            }
-        });
-    });
-
-    // Auto-hide alerts after 5 seconds
-    const alerts = document.querySelectorAll('.alert');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
-        }, 5000);
+    // Form submission
+    form.addEventListener('submit', function() {
+        submitButton.setAttribute('disabled', 'disabled');
+        submitSpinner.classList.remove('d-none');
     });
 });
 </script>
+<?php \App\Core\View::endSection() ?>
